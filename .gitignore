@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+.output/
+.svelte-kit/
+.astro/
+.next/
+.turbo/
+
+# Cloudflare
+.wrangler/
+.dev.vars
+.dev.vars.*
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Test
+coverage/
+.nyc_output/
+
+# Cache
+.cache/
+.eslintcache
+.parcel-cache/
+
+# TypeScript
+*.tsbuildinfo
+
+# Local data
+*.sqlite
+*.sqlite3
+*.db
