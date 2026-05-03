@@ -1,0 +1,3 @@
+# Copy to apps/api/.dev.vars for `wrangler dev`. Do NOT commit .dev.vars.
+SESSION_SIGNING_KEY=dev-please-rotate-this-32-byte-secret
+APP_ORIGIN=http://localhost:4321

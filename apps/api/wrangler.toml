@@ -1,0 +1,67 @@
+name = "open-strava-api"
+main = "src/index.ts"
+compatibility_date = "2025-12-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+# D1 — relational store. Run `pnpm wrangler d1 create open-strava` and
+# paste the returned ID into `database_id`.
+[[d1_databases]]
+binding = "DB"
+database_name = "open-strava"
+database_id = "REPLACE_WITH_D1_ID"
+migrations_dir = "../../infra/wrangler/migrations"
+
+# R2 — raw FIT/TCX/GPX, parsed JSON, generated images.
+[[r2_buckets]]
+binding = "RAW_BUCKET"
+bucket_name = "open-strava-raw"
+
+[[r2_buckets]]
+binding = "PARSED_BUCKET"
+bucket_name = "open-strava-parsed"
+
+[[r2_buckets]]
+binding = "EXPORTS_BUCKET"
+bucket_name = "open-strava-exports"
+
+# KV — sessions, hot leaderboard slices, feed slices.
+[[kv_namespaces]]
+binding = "KV_SESSIONS"
+id = "REPLACE_WITH_KV_SESSIONS_ID"
+
+[[kv_namespaces]]
+binding = "KV_LEADERBOARDS"
+id = "REPLACE_WITH_KV_LEADERBOARDS_ID"
+
+[[kv_namespaces]]
+binding = "KV_FEED"
+id = "REPLACE_WITH_KV_FEED_ID"
+
+# Queues — async ingest pipeline.
+[[queues.producers]]
+queue = "activity-ingest"
+binding = "INGEST_QUEUE"
+
+[[queues.consumers]]
+queue = "activity-ingest"
+max_batch_size = 5
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "activity-ingest-dlq"
+
+# Vars + secrets:
+# - Set `wrangler secret put SESSION_SIGNING_KEY` for the session HMAC key.
+# - Set `wrangler secret put STRAVA_CLIENT_SECRET` etc. before enabling Strava import.
+[vars]
+ENV = "dev"
+APP_ORIGIN = "https://open-strava.pages.dev"
+
+# Durable Objects (live group rides) wired in a future phase.
+# [[durable_objects.bindings]]
+# name = "LIVE_RIDE"
+# class_name = "LiveRide"
+
+# Observability — pipe logs to R2 via Logpush separately (configured in CF dashboard).
+[observability.logs]
+enabled = true
