@@ -70,8 +70,11 @@ class FakeStmt implements D1PreparedStatement {
 }
 
 export class FakeD1 implements D1Database {
-  private users: Row[] = [];
-  private credentials: Row[] = [];
+  users: Row[] = [];
+  credentials: Row[] = [];
+  activities: Row[] = [];
+  activityMetrics: Row[] = [];
+  pmcDaily: Map<string, Row> = new Map();
 
   prepare(sql: string): D1PreparedStatement {
     return new FakeStmt(this, sql);
@@ -79,8 +82,10 @@ export class FakeD1 implements D1Database {
   exec(): Promise<D1ExecResult> {
     return Promise.resolve({ count: 0, duration: 0 });
   }
-  batch<T = unknown>(): Promise<D1Result<T>[]> {
-    return Promise.resolve([]);
+  async batch<T = unknown>(stmts: D1PreparedStatement[]): Promise<D1Result<T>[]> {
+    const out: D1Result<T>[] = [];
+    for (const s of stmts) out.push(await s.run());
+    return out;
   }
   dump(): Promise<ArrayBuffer> {
     return Promise.resolve(new ArrayBuffer(0));
@@ -124,6 +129,93 @@ export class FakeD1 implements D1Database {
       if (cred) cred.counter = counter;
       return [];
     }
+    if (trimmed.startsWith('SELECT id FROM activities WHERE id')) {
+      const id = params[0];
+      const a = this.activities.find((r) => r.id === id);
+      return a ? [{ id: a.id }] : [];
+    }
+    if (trimmed.startsWith('INSERT INTO activities')) {
+      const [
+        id,
+        athlete_id,
+        source,
+        sport,
+        started_at,
+        total_seconds,
+        distance_m,
+        ascent_m,
+        descent_m,
+        hr_avg,
+        hr_max,
+        power_avg,
+        power_max,
+        np,
+        intensity_factor,
+        tss,
+        kj,
+        speed_avg_ms,
+        speed_max_ms,
+        raw_r2_path,
+        parsed_r2_path,
+      ] = params;
+      this.activities.push({
+        id,
+        athlete_id,
+        source,
+        sport,
+        started_at,
+        total_seconds,
+        distance_m,
+        ascent_m,
+        descent_m,
+        hr_avg,
+        hr_max,
+        power_avg,
+        power_max,
+        np,
+        intensity_factor,
+        tss,
+        kj,
+        speed_avg_ms,
+        speed_max_ms,
+        raw_r2_path,
+        parsed_r2_path,
+      });
+      return [];
+    }
+    if (trimmed.startsWith('INSERT INTO activity_metrics')) {
+      const [activity_id, key, value] = params;
+      this.activityMetrics.push({ activity_id, key, value });
+      return [];
+    }
+    if (trimmed.startsWith('SELECT ftp, hr_max')) {
+      const id = params[0];
+      const u = this.users.find((r) => r.id === id) as
+        | (Row & {
+            ftp?: number;
+            hrMax?: number;
+            hrRest?: number;
+            thrPace100?: number;
+          })
+        | undefined;
+      if (!u) return [];
+      return [
+        {
+          ftp: u.ftp ?? null,
+          hrMax: u.hrMax ?? null,
+          hrRest: u.hrRest ?? null,
+          thrPace100: u.thrPace100 ?? null,
+        },
+      ];
+    }
+    if (trimmed.startsWith('INSERT INTO pmc_daily')) {
+      const [athlete_id, date, tss] = params as [string, string, number];
+      const key = `${athlete_id}:${date}`;
+      const cur = this.pmcDaily.get(key);
+      if (cur) cur.tss = ((cur.tss as number) ?? 0) + tss;
+      else this.pmcDaily.set(key, { athlete_id, date, tss });
+      return [];
+    }
     return [];
   }
 }
@@ -138,19 +230,28 @@ export class FakeR2 {
   store = new Map<string, FakeR2Object>();
   put = async (
     key: string,
-    body: ArrayBuffer | ArrayBufferView,
+    body: ArrayBuffer | ArrayBufferView | string,
     opts?: { httpMetadata?: { contentType?: string }; customMetadata?: Record<string, string> },
   ): Promise<unknown> => {
-    const ab =
-      body instanceof ArrayBuffer
-        ? body
-        : (body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) as ArrayBuffer);
+    let ab: ArrayBuffer;
+    if (typeof body === 'string') {
+      ab = new TextEncoder().encode(body).buffer as ArrayBuffer;
+    } else if (body instanceof ArrayBuffer) {
+      ab = body;
+    } else {
+      ab = body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) as ArrayBuffer;
+    }
     this.store.set(key, {
       body: ab,
       customMetadata: opts?.customMetadata ?? {},
       httpMetadata: opts?.httpMetadata ?? {},
     });
     return { key };
+  };
+  get = async (key: string): Promise<{ arrayBuffer: () => Promise<ArrayBuffer> } | null> => {
+    const obj = this.store.get(key);
+    if (!obj) return null;
+    return { arrayBuffer: async () => obj.body };
   };
 }
 

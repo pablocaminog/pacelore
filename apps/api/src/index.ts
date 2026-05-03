@@ -44,6 +44,10 @@ export function buildApp(): Hono<{ Bindings: Env }> {
 
 const app = buildApp();
 
+import { queueHandler } from './pipeline/index.js';
+import type { IngestJob } from './env.js';
+
 export default {
   fetch: app.fetch,
-} satisfies ExportedHandler<Env>;
+  queue: (batch: MessageBatch<IngestJob>, env: Env) => queueHandler(batch, env),
+} satisfies ExportedHandler<Env, IngestJob>;

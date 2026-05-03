@@ -11,6 +11,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@open-strava/fit-parser": "workspace:*",
+    "@open-strava/metrics": "workspace:*",
+    "@open-strava/segments": "workspace:*",
     "@simplewebauthn/server": "11.0.0",
     "@simplewebauthn/types": "11.0.0",
     "hono": "4.6.10"

@@ -29,6 +29,15 @@ importers:
 
   apps/api:
     dependencies:
+      '@open-strava/fit-parser':
+        specifier: workspace:*
+        version: link:../../packages/fit-parser
+      '@open-strava/metrics':
+        specifier: workspace:*
+        version: link:../../packages/metrics
+      '@open-strava/segments':
+        specifier: workspace:*
+        version: link:../../packages/segments
       '@simplewebauthn/server':
         specifier: 11.0.0
         version: 11.0.0
