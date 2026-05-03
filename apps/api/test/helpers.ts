@@ -134,6 +134,58 @@ export class FakeD1 implements D1Database {
       const a = this.activities.find((r) => r.id === id);
       return a ? [{ id: a.id }] : [];
     }
+    if (trimmed.startsWith('SELECT id, athlete_id AS athleteId, visibility')) {
+      const id = params[0];
+      const a = this.activities.find((r) => r.id === id);
+      if (!a) return [];
+      return [
+        {
+          id: a.id,
+          athleteId: a.athlete_id,
+          visibility: a.visibility ?? 'private',
+          parsedR2Path: a.parsed_r2_path ?? null,
+        },
+      ];
+    }
+    if (trimmed.startsWith('SELECT id, athlete_id AS athleteId, source')) {
+      const id = params[0];
+      const a = this.activities.find((r) => r.id === id);
+      if (!a) return [];
+      return [
+        {
+          id: a.id,
+          athleteId: a.athlete_id,
+          source: a.source,
+          sport: a.sport,
+          name: a.name ?? null,
+          description: a.description ?? null,
+          startedAt: a.started_at,
+          totalSeconds: a.total_seconds,
+          distanceM: a.distance_m,
+          ascentM: a.ascent_m ?? null,
+          descentM: a.descent_m ?? null,
+          hrAvg: a.hr_avg ?? null,
+          hrMax: a.hr_max ?? null,
+          powerAvg: a.power_avg ?? null,
+          powerMax: a.power_max ?? null,
+          np: a.np ?? null,
+          intensityFactor: a.intensity_factor ?? null,
+          tss: a.tss ?? null,
+          kj: a.kj ?? null,
+          speedAvgMs: a.speed_avg_ms ?? null,
+          speedMaxMs: a.speed_max_ms ?? null,
+          calories: a.calories ?? null,
+          visibility: a.visibility ?? 'private',
+          parsedR2Path: a.parsed_r2_path ?? null,
+        },
+      ];
+    }
+    if (trimmed.startsWith('SELECT key, value FROM activity_metrics')) {
+      const aid = params[0];
+      return this.activityMetrics
+        .filter((r) => r.activity_id === aid)
+        .map((r) => ({ key: r.key, value: r.value }));
+    }
     if (trimmed.startsWith('INSERT INTO activities')) {
       const [
         id,
@@ -180,6 +232,7 @@ export class FakeD1 implements D1Database {
         speed_max_ms,
         raw_r2_path,
         parsed_r2_path,
+        visibility: 'private',
       });
       return [];
     }

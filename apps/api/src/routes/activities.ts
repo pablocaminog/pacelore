@@ -24,6 +24,67 @@ activityRoutes.use('*', requireSession());
 const MAX_BYTES = 25 * 1024 * 1024; // 25 MB — well above any real activity file
 const VALID_SOURCES = new Set(['fit', 'tcx', 'gpx'] as const);
 
+activityRoutes.get('/activities/:id', async (c) => {
+  const id = c.req.param('id');
+  const session = c.get('session');
+  const row = await c.env.DB.prepare(
+    `SELECT
+       id, athlete_id AS athleteId, source, sport, name, description,
+       started_at AS startedAt, total_seconds AS totalSeconds,
+       distance_m AS distanceM, ascent_m AS ascentM, descent_m AS descentM,
+       hr_avg AS hrAvg, hr_max AS hrMax,
+       power_avg AS powerAvg, power_max AS powerMax,
+       np, intensity_factor AS intensityFactor, tss, kj,
+       speed_avg_ms AS speedAvgMs, speed_max_ms AS speedMaxMs,
+       calories, visibility,
+       parsed_r2_path AS parsedR2Path
+     FROM activities WHERE id = ?`,
+  )
+    .bind(id)
+    .first<ActivityRow>();
+  if (!row) throw new HTTPException(404, { message: 'activity not found' });
+
+  if (!canView(row, session.userId)) {
+    throw new HTTPException(403, { message: 'not allowed to view this activity' });
+  }
+
+  const metricsResult = await c.env.DB.prepare(
+    'SELECT key, value FROM activity_metrics WHERE activity_id = ?',
+  )
+    .bind(id)
+    .all<{ key: string; value: number }>();
+
+  return c.json({
+    activity: row,
+    metrics: metricsResult.results ?? [],
+  });
+});
+
+activityRoutes.get('/activities/:id/stream', async (c) => {
+  const id = c.req.param('id');
+  const session = c.get('session');
+  const row = await c.env.DB.prepare(
+    'SELECT id, athlete_id AS athleteId, visibility, parsed_r2_path AS parsedR2Path FROM activities WHERE id = ?',
+  )
+    .bind(id)
+    .first<{ id: string; athleteId: string; visibility: string; parsedR2Path: string | null }>();
+  if (!row) throw new HTTPException(404, { message: 'activity not found' });
+  if (!canView(row, session.userId)) {
+    throw new HTTPException(403, { message: 'not allowed' });
+  }
+  if (!row.parsedR2Path) {
+    throw new HTTPException(404, { message: 'parsed stream not yet available' });
+  }
+  const obj = await c.env.PARSED_BUCKET.get(row.parsedR2Path);
+  if (!obj) throw new HTTPException(404, { message: 'parsed object missing' });
+  return new Response(obj.body as ReadableStream, {
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'private, max-age=300',
+    },
+  });
+});
+
 activityRoutes.post('/activities', async (c) => {
   const session = c.get('session');
   const source = inferSource(c.req.raw);
@@ -84,6 +145,20 @@ function contentTypeFor(source: IngestJob['source']): string {
     case 'gpx':
       return 'application/gpx+xml';
   }
+}
+
+interface ActivityRow {
+  id: string;
+  athleteId: string;
+  visibility: string;
+  [k: string]: unknown;
+}
+
+function canView(row: { athleteId: string; visibility: string }, viewerId: string): boolean {
+  if (row.athleteId === viewerId) return true;
+  if (row.visibility === 'public') return true;
+  // 'followers' visibility check deferred until the follow graph is wired.
+  return false;
 }
 
 async function readBody(req: Request): Promise<ArrayBuffer> {
