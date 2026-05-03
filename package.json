@@ -1,0 +1,31 @@
+{
+  "name": "open-strava",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Open-source training platform — Strava + TrainingPeaks alternative on Cloudflare.",
+  "license": "AGPL-3.0-only",
+  "author": "Pablo Caminog <pcaminog@gmail.com>",
+  "homepage": "https://github.com/pablocaminog/open-strava",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pablocaminog/open-strava.git"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "pnpm -r run lint",
+    "format": "pnpm -r run format",
+    "dev:web": "pnpm --filter @open-strava/web dev",
+    "dev:api": "pnpm --filter @open-strava/api dev"
+  },
+  "devDependencies": {
+    "typescript": "5.6.3"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@open-strava/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo \"web dev — wired in T22\" && exit 0",
+    "build": "echo \"web build — wired in T22\" && exit 0",
+    "typecheck": "echo \"web typecheck — wired in T22\" && exit 0"
+  }
+}

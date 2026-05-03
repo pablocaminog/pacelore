@@ -1,0 +1,11 @@
+{
+  "name": "@open-strava/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo \"api dev — wired in T16\" && exit 0",
+    "build": "echo \"api build — wired in T16\" && exit 0",
+    "typecheck": "echo \"api typecheck — wired in T16\" && exit 0"
+  }
+}

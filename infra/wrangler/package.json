@@ -1,0 +1,12 @@
+{
+  "name": "@open-strava/infra-wrangler",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Cloudflare Wrangler config + D1 migrations.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "build": "echo \"wrangler infra — wired in T14\" && exit 0",
+    "typecheck": "echo \"wrangler typecheck — wired in T14\" && exit 0"
+  }
+}
