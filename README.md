@@ -13,17 +13,17 @@ Runs entirely on Cloudflare (Workers, D1, R2, KV, Queues, Durable Objects). Auto
 
 ## Stack
 
-| Layer | Tech |
-|---|---|
-| Edge compute | Cloudflare Workers (TypeScript) |
-| Web | Astro on Cloudflare Pages |
-| Relational | Cloudflare D1 |
-| Object storage | Cloudflare R2 |
-| Hot KV | Cloudflare KV |
-| Queues | Cloudflare Queues |
-| Real-time | Durable Objects |
-| Search | Vectorize + D1 FTS |
-| AI | Workers AI |
+| Layer          | Tech                            |
+| -------------- | ------------------------------- |
+| Edge compute   | Cloudflare Workers (TypeScript) |
+| Web            | Astro on Cloudflare Pages       |
+| Relational     | Cloudflare D1                   |
+| Object storage | Cloudflare R2                   |
+| Hot KV         | Cloudflare KV                   |
+| Queues         | Cloudflare Queues               |
+| Real-time      | Durable Objects                 |
+| Search         | Vectorize + D1 FTS              |
+| AI             | Workers AI                      |
 
 ## Repo layout
 
