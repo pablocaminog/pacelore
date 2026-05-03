@@ -15,7 +15,8 @@
     "@astrojs/tailwind": "5.1.4",
     "@simplewebauthn/browser": "11.0.0",
     "astro": "5.7.10",
-    "tailwindcss": "3.4.16"
+    "tailwindcss": "3.4.16",
+    "uplot": "1.6.31"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.4",

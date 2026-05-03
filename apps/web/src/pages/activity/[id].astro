@@ -1,0 +1,179 @@
+---
+import Base from '../../layouts/Base.astro';
+const { id } = Astro.params;
+---
+
+<Base title={`Activity · ${id}`}>
+  <section class="space-y-6">
+    <header>
+      <p class="text-xs uppercase tracking-wider text-neutral-500">Activity</p>
+      <h1 id="activity-title" class="text-2xl font-bold">Loading…</h1>
+      <p id="activity-subtitle" class="text-sm text-neutral-600 dark:text-neutral-400"></p>
+    </header>
+
+    <dl id="activity-summary" class="grid grid-cols-2 gap-4 sm:grid-cols-4"></dl>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-semibold">Time series</h2>
+      <div id="time-chart" class="w-full"></div>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-semibold">Peak power curve</h2>
+      <div id="peak-chart" class="w-full"></div>
+    </section>
+  </section>
+</Base>
+
+<script define:vars={{ activityId: id }}>
+  // Pulled at runtime; the server only renders the shell.
+  window.__OPEN_STRAVA_ACTIVITY__ = activityId;
+</script>
+
+<script>
+  import uPlot from 'uplot';
+  import 'uplot/dist/uPlot.min.css';
+
+  type Sample = {
+    t: number;
+    hr?: number;
+    power?: number;
+    speed?: number;
+    altitude?: number;
+  };
+
+  type ActivityRecord = {
+    samples: Sample[];
+    session: { sport: string; startedAt: string; totalSeconds: number };
+  };
+
+  type ActivityRow = {
+    id: string;
+    sport: string;
+    name: string | null;
+    startedAt: number;
+    totalSeconds: number;
+    distanceM: number | null;
+    np: number | null;
+    tss: number | null;
+    powerAvg: number | null;
+    hrAvg: number | null;
+  };
+
+  type Metric = { key: string; value: number };
+
+  const id = (window as unknown as { __OPEN_STRAVA_ACTIVITY__: string }).__OPEN_STRAVA_ACTIVITY__;
+  const title = document.getElementById('activity-title')!;
+  const subtitle = document.getElementById('activity-subtitle')!;
+  const summary = document.getElementById('activity-summary')!;
+
+  init().catch((err) => {
+    title.textContent = 'Failed to load';
+    subtitle.textContent = (err as Error).message;
+  });
+
+  async function init() {
+    const [meta, stream] = await Promise.all([
+      fetch(`/api/v1/activities/${id}`, { credentials: 'include' }).then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json() as Promise<{ activity: ActivityRow; metrics: Metric[] }>;
+      }),
+      fetch(`/api/v1/activities/${id}/stream`, { credentials: 'include' }).then((r) => {
+        if (!r.ok) throw new Error(`stream HTTP ${r.status}`);
+        return r.json() as Promise<ActivityRecord>;
+      }),
+    ]);
+
+    renderHeader(meta.activity);
+    renderSummary(meta.activity, meta.metrics);
+    renderTimeChart(stream.samples);
+    renderPeakChart(meta.metrics);
+  }
+
+  function renderHeader(a: ActivityRow) {
+    title.textContent = a.name ?? `${a.sport} · ${formatDate(a.startedAt)}`;
+    subtitle.textContent = `${a.sport} · ${formatDuration(a.totalSeconds)}${
+      a.distanceM ? ` · ${(a.distanceM / 1000).toFixed(2)} km` : ''
+    }`;
+  }
+
+  function renderSummary(a: ActivityRow, metrics: Metric[]) {
+    const cells: { label: string; value: string }[] = [];
+    if (a.np != null) cells.push({ label: 'NP', value: `${Math.round(a.np)} W` });
+    if (a.powerAvg != null) cells.push({ label: 'Avg power', value: `${Math.round(a.powerAvg)} W` });
+    if (a.hrAvg != null) cells.push({ label: 'Avg HR', value: `${Math.round(a.hrAvg)} bpm` });
+    if (a.tss != null) cells.push({ label: 'TSS', value: a.tss.toFixed(1) });
+    const trimp = metrics.find((m) => m.key === 'hr.trimp');
+    if (trimp) cells.push({ label: 'TRIMP', value: trimp.value.toFixed(1) });
+    summary.innerHTML = cells
+      .map(
+        (c) =>
+          `<div class="rounded border border-neutral-200 p-3 dark:border-neutral-800">
+            <dt class="text-xs uppercase text-neutral-500">${c.label}</dt>
+            <dd class="text-lg font-semibold">${c.value}</dd>
+          </div>`,
+      )
+      .join('');
+  }
+
+  function renderTimeChart(samples: Sample[]) {
+    if (samples.length === 0) return;
+    const t = samples.map((s) => s.t);
+    const hr = samples.map((s) => s.hr ?? null);
+    const power = samples.map((s) => s.power ?? null);
+    const speed = samples.map((s) => (s.speed != null ? s.speed * 3.6 : null));
+
+    const opts: uPlot.Options = {
+      width: 900,
+      height: 300,
+      cursor: { drag: { x: true, y: false } },
+      scales: { x: { time: false }, y: { auto: true } },
+      series: [
+        { label: 'sec' },
+        { label: 'HR (bpm)', stroke: '#ef4444' },
+        { label: 'Power (W)', stroke: '#fc4c02' },
+        { label: 'Speed (km/h)', stroke: '#3b82f6' },
+      ],
+    };
+
+    const el = document.getElementById('time-chart')!;
+    new uPlot(opts, [t, hr, power, speed], el);
+  }
+
+  function renderPeakChart(metrics: Metric[]) {
+    const peaks = metrics
+      .filter((m) => m.key.startsWith('power.peak.'))
+      .map((m) => ({ t: Number(m.key.split('.')[2]), v: m.value }))
+      .sort((a, b) => a.t - b.t);
+    if (peaks.length === 0) return;
+
+    const opts: uPlot.Options = {
+      width: 900,
+      height: 250,
+      scales: { x: { time: false, distr: 3, log: 10 }, y: { auto: true } },
+      axes: [{ label: 'duration (s)' }, { label: 'mean power (W)' }],
+      series: [
+        { label: 's' },
+        { label: 'Peak (W)', stroke: '#fc4c02' },
+      ],
+    };
+
+    const el = document.getElementById('peak-chart')!;
+    new uPlot(
+      opts,
+      [peaks.map((p) => p.t), peaks.map((p) => p.v)],
+      el,
+    );
+  }
+
+  function formatDuration(seconds: number) {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+  }
+
+  function formatDate(epochSeconds: number) {
+    return new Date(epochSeconds * 1000).toLocaleString();
+  }
+</script>
