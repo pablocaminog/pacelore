@@ -11,7 +11,10 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "echo \"fit-parser tests — wired in T05\" && exit 0",
-    "typecheck": "echo \"fit-parser typecheck — wired in T05\" && exit 0"
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "vitest": "2.1.5"
   }
 }
