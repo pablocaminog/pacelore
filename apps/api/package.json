@@ -11,6 +11,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@simplewebauthn/server": "11.0.0",
+    "@simplewebauthn/types": "11.0.0",
     "hono": "4.6.10"
   },
   "devDependencies": {
