@@ -1,0 +1,101 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base title="Upload · open-strava">
+  <section class="mx-auto max-w-xl space-y-6">
+    <h1 class="text-2xl font-bold">Upload an activity</h1>
+    <p class="text-sm text-neutral-600 dark:text-neutral-400">
+      Drag a FIT, TCX, or GPX file onto the box, or click to choose. Your
+      browser uploads it directly to the API; parsing and metric computation
+      happen in the background.
+    </p>
+
+    <div
+      id="drop"
+      class="flex h-48 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-neutral-300 text-center text-sm text-neutral-600 hover:border-accent dark:border-neutral-700 dark:text-neutral-400"
+    >
+      <div>
+        <strong class="block">Drop file here</strong>
+        <span>or click to choose · max 25 MB · .fit / .tcx / .gpx</span>
+      </div>
+    </div>
+    <input id="file-input" type="file" accept=".fit,.tcx,.gpx" class="sr-only" />
+
+    <ul id="results" class="space-y-2 text-sm" aria-live="polite"></ul>
+  </section>
+</Base>
+
+<script>
+  const drop = document.getElementById('drop')!;
+  const fileInput = document.getElementById('file-input') as HTMLInputElement;
+  const results = document.getElementById('results')!;
+
+  const SOURCE_BY_EXT: Record<string, 'fit' | 'tcx' | 'gpx'> = {
+    fit: 'fit',
+    tcx: 'tcx',
+    gpx: 'gpx',
+  };
+
+  drop.addEventListener('click', () => fileInput.click());
+  drop.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    drop.classList.add('border-accent');
+  });
+  drop.addEventListener('dragleave', () => drop.classList.remove('border-accent'));
+  drop.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    drop.classList.remove('border-accent');
+    const files = Array.from(e.dataTransfer?.files ?? []);
+    for (const f of files) await upload(f);
+  });
+  fileInput.addEventListener('change', async () => {
+    if (!fileInput.files) return;
+    for (const f of Array.from(fileInput.files)) await upload(f);
+    fileInput.value = '';
+  });
+
+  async function upload(file: File) {
+    const ext = file.name.toLowerCase().split('.').pop() ?? '';
+    const source = SOURCE_BY_EXT[ext];
+    const li = document.createElement('li');
+    li.className = 'rounded border border-neutral-200 px-3 py-2 dark:border-neutral-800';
+    li.textContent = `${file.name} — uploading…`;
+    results.appendChild(li);
+
+    if (!source) {
+      li.textContent = `${file.name} — unsupported extension`;
+      return;
+    }
+    if (file.size > 25 * 1024 * 1024) {
+      li.textContent = `${file.name} — too large (>25 MB)`;
+      return;
+    }
+
+    try {
+      const buf = await file.arrayBuffer();
+      const res = await fetch('/api/v1/activities', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type':
+            source === 'fit'
+              ? 'application/octet-stream'
+              : source === 'gpx'
+                ? 'application/gpx+xml'
+                : 'application/tcx+xml',
+          'X-Activity-Source': source,
+        },
+        body: buf,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(err.error ?? `HTTP ${res.status}`);
+      }
+      const body = (await res.json()) as { activityId: string };
+      li.innerHTML = `${file.name} — queued · <a class="text-accent hover:underline" href="/activity/${body.activityId}">view</a>`;
+    } catch (err) {
+      li.textContent = `${file.name} — failed: ${(err as Error).message}`;
+    }
+  }
+</script>
