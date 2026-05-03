@@ -19,3 +19,4 @@ export {
   type PaceMetrics,
 } from './pace.js';
 export { peakCurve, DEFAULT_PEAK_WINDOWS, type PeakPoint } from './peakCurve.js';
+export { pmcDaily, type PmcInput, type PmcDay, type PmcOptions } from './pmc.js';
