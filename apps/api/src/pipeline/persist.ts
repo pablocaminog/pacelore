@@ -11,6 +11,8 @@ import { findSegmentEfforts, type ActivityPoint, type Segment } from '@pacelore/
 import type { Env, IngestJob } from '../env.js';
 import type { ActivitySummary, MetricKv } from './metrics.js';
 import { uuidv7 } from '../util/uuid.js';
+import { uploadToArweave } from '../integrations/arweave.js';
+import { atprotoCreateRecord } from '../integrations/atproto.js';
 
 export interface PersistInput {
   job: IngestJob;
@@ -88,6 +90,8 @@ export async function persistActivity(env: Env, input: PersistInput): Promise<vo
   // Segment effort detection — bbox prefilter against the activity's
   // bbox via SQL, then DTW match in-process.
   await detectSegmentEfforts(env, job, activity);
+  await mirrorToArweave(env, job, summary).catch((e) => console.error('arweave fail', e));
+  await mirrorToAtproto(env, job, activity, summary).catch((e) => console.error('atproto fail', e));
 
   // PMC: bump pmc_daily.tss for the activity's date. CTL/ATL/TSB are
   // recomputed by a periodic cron (T per architecture doc) — keeping
@@ -165,5 +169,84 @@ async function detectSegmentEfforts(
     )
       .bind(effortId, e.segmentId, job.athleteId, job.activityId, time, startedAt)
       .run();
+  }
+}
+
+interface PrefRow {
+  arweave: number;
+  atDid: string | null;
+  atPds: string | null;
+  atJwt: string | null;
+}
+
+async function loadPrefs(env: Env, userId: string): Promise<PrefRow | null> {
+  return env.DB.prepare(
+    `SELECT arweave_permanence AS arweave, atproto_did AS atDid,
+            atproto_pds AS atPds, atproto_access_jwt AS atJwt
+       FROM users WHERE id = ?`,
+  )
+    .bind(userId)
+    .first<PrefRow>();
+}
+
+async function mirrorToArweave(env: Env, job: IngestJob, _summary: ActivitySummary): Promise<void> {
+  if (!env.ARWEAVE_TURBO_TOKEN) return;
+  const prefs = await loadPrefs(env, job.athleteId);
+  if (!prefs?.arweave) return;
+  const obj = await env.RAW_BUCKET.get(job.rawR2Path);
+  if (!obj) return;
+  const buf = (await obj.arrayBuffer()) as ArrayBuffer;
+  const result = await uploadToArweave(env.ARWEAVE_TURBO_TOKEN, buf, {
+    'Content-Type': contentTypeFor(job.source),
+    'App-Name': 'pacelore',
+    'Activity-Id': job.activityId,
+    'Athlete-Id': job.athleteId,
+    Source: job.source,
+  });
+  await env.DB.prepare('UPDATE activities SET arweave_tx = ? WHERE id = ?')
+    .bind(result.id, job.activityId)
+    .run();
+}
+
+async function mirrorToAtproto(
+  env: Env,
+  job: IngestJob,
+  activity: ActivityRecord,
+  summary: ActivitySummary,
+): Promise<void> {
+  const prefs = await loadPrefs(env, job.athleteId);
+  if (!prefs?.atDid || !prefs.atPds || !prefs.atJwt) return;
+  const record = {
+    $type: 'com.pacelore.activity',
+    activityId: job.activityId,
+    sport: activity.session.sport,
+    startedAt: activity.session.startedAt.toISOString(),
+    durationSeconds: summary.totalSeconds,
+    distanceMeters: summary.distanceM,
+    tss: summary.tss,
+    np: summary.np,
+    source: job.source,
+    createdAt: new Date().toISOString(),
+  };
+  const out = await atprotoCreateRecord(
+    prefs.atPds,
+    prefs.atJwt,
+    prefs.atDid,
+    'com.pacelore.activity',
+    record,
+  );
+  await env.DB.prepare('UPDATE activities SET atproto_uri = ? WHERE id = ?')
+    .bind(out.uri, job.activityId)
+    .run();
+}
+
+function contentTypeFor(source: 'fit' | 'tcx' | 'gpx'): string {
+  switch (source) {
+    case 'fit':
+      return 'application/vnd.fit';
+    case 'tcx':
+      return 'application/tcx+xml';
+    case 'gpx':
+      return 'application/gpx+xml';
   }
 }

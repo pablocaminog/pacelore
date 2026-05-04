@@ -10,6 +10,10 @@ export interface Env {
 
   // Secrets
   SESSION_SIGNING_KEY: string;
+  STRAVA_CLIENT_ID?: string;
+  STRAVA_CLIENT_SECRET?: string;
+  ARWEAVE_TURBO_TOKEN?: string;
+  ATPROTO_PDS_URL?: string;
 
   // Storage
   DB: D1Database;

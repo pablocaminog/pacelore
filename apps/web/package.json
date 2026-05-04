@@ -16,6 +16,7 @@
     "@simplewebauthn/browser": "11.0.0",
     "astro": "5.7.10",
     "tailwindcss": "3.4.16",
+    "maplibre-gl": "4.7.1",
     "uplot": "1.6.31"
   },
   "devDependencies": {

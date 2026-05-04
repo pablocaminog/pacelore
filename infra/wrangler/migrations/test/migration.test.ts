@@ -27,10 +27,12 @@ function open(): DatabaseSyncT {
 }
 
 const sql0002Path = join(__dirname, '..', '0002_api_keys.sql');
+const sql0003Path = join(__dirname, '..', '0003_decentralization.sql');
 
 function applyAll(db: DatabaseSyncT) {
   db.exec(readFileSync(sqlPath, 'utf-8'));
   db.exec(readFileSync(sql0002Path, 'utf-8'));
+  db.exec(readFileSync(sql0003Path, 'utf-8'));
 }
 
 describe('migrations', () => {
@@ -41,6 +43,28 @@ describe('migrations', () => {
       .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
       .all() as { name: string }[];
     expect(rows.map((r) => r.name)).toContain('api_keys');
+  });
+
+  it('0003 adds decentralization columns', () => {
+    const db = open();
+    applyAll(db);
+    const userCols = db.prepare("PRAGMA table_info('users')").all() as { name: string }[];
+    const userColNames = new Set(userCols.map((c) => c.name));
+    for (const col of [
+      'arweave_permanence',
+      'atproto_handle',
+      'atproto_pds',
+      'atproto_app_password',
+      'atproto_did',
+      'atproto_access_jwt',
+      'atproto_refresh_jwt',
+    ]) {
+      expect(userColNames.has(col), `expected users.${col}`).toBe(true);
+    }
+    const actCols = db.prepare("PRAGMA table_info('activities')").all() as { name: string }[];
+    const actColNames = new Set(actCols.map((c) => c.name));
+    expect(actColNames.has('arweave_tx')).toBe(true);
+    expect(actColNames.has('atproto_uri')).toBe(true);
   });
 });
 

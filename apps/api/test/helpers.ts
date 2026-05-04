@@ -251,6 +251,69 @@ export class FakeD1 implements D1Database {
       this.activityMetrics.push({ activity_id, key, value });
       return [];
     }
+    if (trimmed.startsWith('SELECT arweave_permanence AS arweave')) {
+      const id = params[0];
+      const u = this.users.find((r) => r.id === id);
+      return u
+        ? [
+            {
+              arweave: u.arweave_permanence ?? 0,
+              atDid: u.atproto_did ?? null,
+              atPds: u.atproto_pds ?? null,
+              atJwt: u.atproto_access_jwt ?? null,
+            },
+          ]
+        : [];
+    }
+    if (
+      trimmed.startsWith('UPDATE activities SET arweave_tx') ||
+      trimmed.startsWith('UPDATE activities SET atproto_uri')
+    ) {
+      const [val, id] = params;
+      const a = this.activities.find((r) => r.id === id);
+      if (a) {
+        if (trimmed.includes('arweave_tx')) a.arweave_tx = val;
+        else a.atproto_uri = val;
+      }
+      return [];
+    }
+    if (trimmed.startsWith('UPDATE users SET arweave_permanence')) {
+      const [val, id] = params;
+      const u = this.users.find((r) => r.id === id);
+      if (u) u.arweave_permanence = val;
+      return [];
+    }
+    if (trimmed.startsWith('SELECT arweave_permanence AS enabled')) {
+      const id = params[0];
+      const u = this.users.find((r) => r.id === id);
+      return u ? [{ enabled: u.arweave_permanence ?? 0 }] : [];
+    }
+    if (trimmed.startsWith('SELECT atproto_handle')) {
+      const id = params[0];
+      const u = this.users.find((r) => r.id === id);
+      return u
+        ? [
+            {
+              handle: u.atproto_handle ?? null,
+              did: u.atproto_did ?? null,
+              pds: u.atproto_pds ?? null,
+            },
+          ]
+        : [];
+    }
+    if (trimmed.startsWith('UPDATE users SET atproto_handle')) {
+      const [handle, pds, pw, did, jwt, refreshJwt, id] = params;
+      const u = this.users.find((r) => r.id === id);
+      if (u) {
+        u.atproto_handle = handle;
+        u.atproto_pds = pds;
+        u.atproto_app_password = pw;
+        u.atproto_did = did;
+        u.atproto_access_jwt = jwt;
+        u.atproto_refresh_jwt = refreshJwt;
+      }
+      return [];
+    }
     if (trimmed.startsWith('SELECT ftp, hr_max')) {
       const id = params[0];
       const u = this.users.find((r) => r.id === id) as

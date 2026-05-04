@@ -20,6 +20,9 @@ import { eventRoutes } from './routes/events.js';
 import { exportRoutes } from './routes/exports.js';
 import { settingsRoutes } from './routes/settings.js';
 import { mcpRoutes } from './routes/mcp.js';
+import { stravaRoutes } from './routes/strava.js';
+import { permanenceRoutes } from './routes/permanence.js';
+import { atprotoRoutes } from './routes/atproto.js';
 import { queueHandler } from './pipeline/index.js';
 import { scheduledHandler } from './scheduled.js';
 import type { Env, IngestJob } from './env.js';
@@ -49,6 +52,9 @@ export function buildApp(): Hono<{ Bindings: Env }> {
   app.route('/api/v1', eventRoutes);
   app.route('/api/v1', exportRoutes);
   app.route('/api/v1', settingsRoutes);
+  app.route('/api/v1', stravaRoutes);
+  app.route('/api/v1', permanenceRoutes);
+  app.route('/api/v1', atprotoRoutes);
   app.route('/mcp', mcpRoutes);
 
   app.notFound((c) => c.json({ error: 'not_found', status: 404 }, 404));
