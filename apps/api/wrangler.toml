@@ -55,7 +55,7 @@ dead_letter_queue = "activity-ingest-dlq"
 # - Set `wrangler secret put STRAVA_CLIENT_SECRET` etc. before enabling Strava import.
 [vars]
 ENV = "dev"
-APP_ORIGIN = "https://pacelore.pages.dev"
+APP_ORIGIN = "https://pacelore.com"
 
 # Durable Objects (live group rides) wired in a future phase.
 # [[durable_objects.bindings]]
