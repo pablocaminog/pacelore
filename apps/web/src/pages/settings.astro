@@ -1,0 +1,170 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base title="Settings · open-strava">
+  <section class="space-y-6">
+    <h1 class="text-2xl font-bold">Settings</h1>
+    <form id="settings-form" class="space-y-4 max-w-md">
+      <fieldset class="space-y-3">
+        <legend class="text-sm font-medium">Profile</legend>
+        <label class="block text-sm">Display name
+          <input name="displayName" class="mt-1 w-full rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900" />
+        </label>
+        <label class="block text-sm">Bio
+          <textarea name="bio" class="mt-1 w-full rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"></textarea>
+        </label>
+        <label class="block text-sm">Location
+          <input name="location" class="mt-1 w-full rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900" />
+        </label>
+        <label class="block text-sm">Units
+          <select name="unitsPref" class="mt-1 w-full rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900">
+            <option value="metric">Metric (km, kg)</option>
+            <option value="imperial">Imperial (mi, lb)</option>
+          </select>
+        </label>
+        <label class="block text-sm">Sex
+          <select name="sex" class="mt-1 w-full rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900">
+            <option value="unspecified">Unspecified</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+        </label>
+      </fieldset>
+      <fieldset class="space-y-3">
+        <legend class="text-sm font-medium">Thresholds</legend>
+        <label class="block text-sm">FTP (W)
+          <input name="ftp" type="number" class="mt-1 w-full rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900" />
+        </label>
+        <label class="block text-sm">HR max (bpm)
+          <input name="hrMax" type="number" class="mt-1 w-full rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900" />
+        </label>
+        <label class="block text-sm">HR rest (bpm)
+          <input name="hrRest" type="number" class="mt-1 w-full rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900" />
+        </label>
+        <label class="block text-sm">Threshold pace (m/s × 100)
+          <input name="thresholdPaceMsX100" type="number" class="mt-1 w-full rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900" />
+        </label>
+      </fieldset>
+      <button class="rounded bg-accent px-4 py-2 font-medium text-white">Save</button>
+      <p id="save-status" aria-live="polite" class="text-sm"></p>
+    </form>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-semibold">API keys</h2>
+      <p class="text-sm text-neutral-600 dark:text-neutral-400">
+        For the public REST API and the MCP server. The secret is shown once at mint time.
+      </p>
+      <ul id="key-list" class="space-y-2 text-sm"></ul>
+      <details class="rounded border border-neutral-200 p-3 dark:border-neutral-800">
+        <summary class="cursor-pointer font-medium">Mint a new key</summary>
+        <form id="mint-form" class="mt-2 space-y-2 text-sm">
+          <input
+            name="name"
+            placeholder="key name"
+            class="w-full rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
+          />
+          <label class="block"><input type="checkbox" name="scope" value="read:activities" checked /> read:activities</label>
+          <label class="block"><input type="checkbox" name="scope" value="read:social" /> read:social</label>
+          <label class="block"><input type="checkbox" name="scope" value="write:social" /> write:social</label>
+          <button class="rounded bg-accent px-3 py-1.5 text-white">Mint</button>
+          <pre id="minted" class="overflow-x-auto rounded bg-neutral-100 p-2 dark:bg-neutral-900"></pre>
+        </form>
+      </details>
+    </section>
+  </section>
+</Base>
+
+<script>
+  const form = document.getElementById('settings-form') as HTMLFormElement;
+  const status = document.getElementById('save-status')!;
+  const keyList = document.getElementById('key-list')!;
+  const minted = document.getElementById('minted')!;
+  const mintForm = document.getElementById('mint-form') as HTMLFormElement;
+
+  init();
+
+  async function init() {
+    const r = await fetch('/api/v1/me/settings', { credentials: 'include' });
+    if (!r.ok) {
+      status.innerHTML = `Please <a class="text-accent hover:underline" href="/login">log in</a>.`;
+      return;
+    }
+    const { user } = (await r.json()) as { user: Record<string, unknown> };
+    for (const [k, v] of Object.entries(user)) {
+      const el = form.elements.namedItem(k) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+      if (el && v != null) el.value = String(v);
+    }
+    await loadKeys();
+  }
+
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    status.textContent = '';
+    const payload: Record<string, unknown> = {};
+    new FormData(form).forEach((v, k) => {
+      const sv = String(v);
+      if (sv === '') return;
+      if (['ftp', 'hrMax', 'hrRest', 'thresholdPaceMsX100'].includes(k)) {
+        const n = Number(sv);
+        if (Number.isFinite(n)) payload[k] = n;
+      } else {
+        payload[k] = sv;
+      }
+    });
+    const r = await fetch('/api/v1/me/settings', {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    status.textContent = r.ok ? 'Saved.' : `Failed: HTTP ${r.status}`;
+  });
+
+  async function loadKeys() {
+    const r = await fetch('/api/v1/me/api-keys', { credentials: 'include' });
+    if (!r.ok) return;
+    const body = (await r.json()) as {
+      items: { id: string; name: string | null; scopes: string; revokedAt: number | null }[];
+    };
+    keyList.innerHTML = '';
+    for (const k of body.items) {
+      const li = document.createElement('li');
+      li.className = 'rounded border border-neutral-200 p-2 dark:border-neutral-800';
+      const revoked = k.revokedAt ? ' · <em>revoked</em>' : '';
+      li.innerHTML = `<code>${k.id}</code> · ${k.name ?? '(unnamed)'} · ${k.scopes}${revoked}`;
+      if (!k.revokedAt) {
+        const btn = document.createElement('button');
+        btn.className = 'ml-2 text-xs text-red-600 hover:underline';
+        btn.textContent = 'revoke';
+        btn.addEventListener('click', async () => {
+          const dr = await fetch(`/api/v1/me/api-keys/${k.id}`, {
+            method: 'DELETE',
+            credentials: 'include',
+          });
+          if (dr.ok) loadKeys();
+        });
+        li.appendChild(btn);
+      }
+      keyList.appendChild(li);
+    }
+  }
+
+  mintForm.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const fd = new FormData(mintForm);
+    const scopes = fd.getAll('scope').map(String);
+    const name = String(fd.get('name') ?? '');
+    const r = await fetch('/api/v1/me/api-keys', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, scopes }),
+    });
+    if (r.ok) {
+      const body = (await r.json()) as { key: string };
+      minted.textContent = `Save this — shown only once:\n\n${body.key}`;
+      await loadKeys();
+    }
+  });
+</script>

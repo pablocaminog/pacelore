@@ -1,0 +1,34 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base title="Events · open-strava">
+  <section class="space-y-6">
+    <h1 class="text-2xl font-bold">Upcoming events</h1>
+    <ul id="event-list" class="space-y-2"></ul>
+  </section>
+</Base>
+
+<script>
+  const list = document.getElementById('event-list')!;
+  fetch('/api/v1/events', { credentials: 'include' })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((body) => {
+      if (!body) {
+        list.innerHTML = `<li class="text-sm">log in to see events</li>`;
+        return;
+      }
+      const items = (body as { items: { id: string; name: string; type: string; startsAt: number; location: string | null }[] }).items;
+      list.innerHTML = items.length === 0 ? `<li class="text-sm text-neutral-600">No upcoming events.</li>` : '';
+      for (const e of items) {
+        const li = document.createElement('li');
+        li.className = 'rounded border border-neutral-200 p-3 dark:border-neutral-800';
+        const when = new Date(e.startsAt * 1000).toLocaleString();
+        li.innerHTML = `<a href="/events/${e.id}" class="hover:text-accent"><strong>${escape(e.name)}</strong> · ${escape(e.type)} · ${escape(when)}${e.location ? ' · ' + escape(e.location) : ''}</a>`;
+        list.appendChild(li);
+      }
+    });
+  function escape(s: string) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+</script>

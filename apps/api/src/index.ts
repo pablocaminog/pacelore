@@ -1,14 +1,7 @@
 /**
  * open-strava API worker.
  *
- * Hono router with:
- *   - request id stamping
- *   - CORS for the Pages origin
- *   - error → JSON envelope
- *   - /healthz, /readyz
- *
- * Domain routes (auth, activities, pmc) attach as the matching
- * tasks land.
+ * Hono router. Domain routes attach in `buildApp`.
  */
 
 import { Hono } from 'hono';
@@ -22,7 +15,14 @@ import { athleteRoutes } from './routes/athletes.js';
 import { followRoutes } from './routes/follows.js';
 import { feedRoutes } from './routes/feed.js';
 import { segmentRoutes } from './routes/segments.js';
-import type { Env } from './env.js';
+import { clubRoutes } from './routes/clubs.js';
+import { eventRoutes } from './routes/events.js';
+import { exportRoutes } from './routes/exports.js';
+import { settingsRoutes } from './routes/settings.js';
+import { mcpRoutes } from './routes/mcp.js';
+import { queueHandler } from './pipeline/index.js';
+import { scheduledHandler } from './scheduled.js';
+import type { Env, IngestJob } from './env.js';
 
 export function buildApp(): Hono<{ Bindings: Env }> {
   const app = new Hono<{ Bindings: Env }>();
@@ -45,6 +45,11 @@ export function buildApp(): Hono<{ Bindings: Env }> {
   app.route('/api/v1', followRoutes);
   app.route('/api/v1', feedRoutes);
   app.route('/api/v1', segmentRoutes);
+  app.route('/api/v1', clubRoutes);
+  app.route('/api/v1', eventRoutes);
+  app.route('/api/v1', exportRoutes);
+  app.route('/api/v1', settingsRoutes);
+  app.route('/mcp', mcpRoutes);
 
   app.notFound((c) => c.json({ error: 'not_found', status: 404 }, 404));
   return app;
@@ -52,10 +57,9 @@ export function buildApp(): Hono<{ Bindings: Env }> {
 
 const app = buildApp();
 
-import { queueHandler } from './pipeline/index.js';
-import type { IngestJob } from './env.js';
-
 export default {
   fetch: app.fetch,
   queue: (batch: MessageBatch<IngestJob>, env: Env) => queueHandler(batch, env),
+  scheduled: (event: ScheduledController, env: Env, ctx: ExecutionContext) =>
+    scheduledHandler(event, env, ctx),
 } satisfies ExportedHandler<Env, IngestJob>;

@@ -1,0 +1,69 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base title="Clubs · open-strava">
+  <section class="space-y-6">
+    <h1 class="text-2xl font-bold">Clubs</h1>
+    <ul id="club-list" class="space-y-2"></ul>
+    <details class="rounded border border-neutral-200 p-3 dark:border-neutral-800">
+      <summary class="cursor-pointer font-medium">Create a club</summary>
+      <form id="new-club" class="mt-2 space-y-2">
+        <input
+          name="name"
+          required
+          placeholder="Name"
+          class="w-full rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
+        />
+        <textarea
+          name="description"
+          placeholder="Description"
+          class="w-full rounded border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+        ></textarea>
+        <button class="rounded bg-accent px-3 py-1.5 text-sm text-white">Create</button>
+      </form>
+    </details>
+  </section>
+</Base>
+
+<script>
+  const list = document.getElementById('club-list')!;
+
+  load();
+  (document.getElementById('new-club') as HTMLFormElement).addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const fd = new FormData(ev.target as HTMLFormElement);
+    const r = await fetch('/api/v1/clubs', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: fd.get('name'),
+        description: fd.get('description'),
+      }),
+    });
+    if (r.ok) await load();
+  });
+
+  async function load() {
+    const r = await fetch('/api/v1/clubs', { credentials: 'include' });
+    if (!r.ok) {
+      list.innerHTML = `<li class="text-sm">log in to see clubs</li>`;
+      return;
+    }
+    const body = (await r.json()) as { items: { id: string; name: string; sportFocus: string | null }[] };
+    list.innerHTML = '';
+    if (body.items.length === 0) {
+      list.innerHTML = `<li class="text-sm text-neutral-600 dark:text-neutral-400">No public clubs yet.</li>`;
+    }
+    for (const c of body.items) {
+      const li = document.createElement('li');
+      li.className = 'rounded border border-neutral-200 p-3 dark:border-neutral-800';
+      li.innerHTML = `<a href="/clubs/${c.id}" class="hover:text-accent"><strong>${escape(c.name)}</strong>${c.sportFocus ? ` · ${escape(c.sportFocus)}` : ''}</a>`;
+      list.appendChild(li);
+    }
+  }
+  function escape(s: string) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+</script>

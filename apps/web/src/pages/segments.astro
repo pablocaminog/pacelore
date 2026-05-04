@@ -1,0 +1,49 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base title="Segments · open-strava">
+  <section class="space-y-6">
+    <h1 class="text-2xl font-bold">Segments</h1>
+    <p class="text-sm text-neutral-600 dark:text-neutral-400">
+      Search by bounding box. Format: <code>minLat,minLng,maxLat,maxLng</code>.
+    </p>
+    <form id="seg-form" class="flex gap-2">
+      <input
+        name="bbox"
+        required
+        placeholder="40.0,-74.1,40.5,-73.9"
+        class="flex-1 rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
+      />
+      <button class="rounded bg-accent px-4 py-2 text-sm font-medium text-white">Search</button>
+    </form>
+    <ul id="seg-list" class="space-y-2"></ul>
+  </section>
+</Base>
+
+<script>
+  const form = document.getElementById('seg-form') as HTMLFormElement;
+  const list = document.getElementById('seg-list')!;
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const bbox = String(new FormData(form).get('bbox'));
+    const r = await fetch(`/api/v1/segments?bbox=${encodeURIComponent(bbox)}`, {
+      credentials: 'include',
+    });
+    if (!r.ok) {
+      list.innerHTML = `<li class="text-red-600">HTTP ${r.status}</li>`;
+      return;
+    }
+    const body = (await r.json()) as { items: { id: string; name: string; sport: string; distanceM: number }[] };
+    list.innerHTML = '';
+    for (const s of body.items) {
+      const li = document.createElement('li');
+      li.className = 'rounded border border-neutral-200 p-3 dark:border-neutral-800';
+      li.innerHTML = `<a href="/segments/${s.id}" class="hover:text-accent"><strong>${escape(s.name)}</strong> · ${escape(s.sport)} · ${(s.distanceM / 1000).toFixed(2)} km</a>`;
+      list.appendChild(li);
+    }
+  });
+  function escape(s: string) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+</script>

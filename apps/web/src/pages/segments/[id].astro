@@ -1,0 +1,71 @@
+---
+import Base from '../../layouts/Base.astro';
+const { id } = Astro.params;
+---
+
+<Base title={`Segment · ${id}`}>
+  <section class="space-y-6">
+    <header id="seg-header" class="space-y-1">
+      <h1 class="text-2xl font-bold">Loading…</h1>
+    </header>
+    <section class="space-y-2">
+      <h2 class="text-lg font-semibold">Leaderboard</h2>
+      <div class="flex gap-2 text-sm">
+        <button data-w="all" class="window-btn rounded border px-2 py-1">All-time</button>
+        <button data-w="year" class="window-btn rounded border px-2 py-1">This year</button>
+        <button data-w="90d" class="window-btn rounded border px-2 py-1">Last 90 days</button>
+      </div>
+      <ol id="lb-list" class="space-y-1 text-sm"></ol>
+    </section>
+  </section>
+</Base>
+
+<script define:vars={{ id }}>
+  window.__OPEN_STRAVA_SEG__ = id;
+</script>
+
+<script>
+  const id = (window as unknown as { __OPEN_STRAVA_SEG__: string }).__OPEN_STRAVA_SEG__;
+  const header = document.getElementById('seg-header')!;
+  const list = document.getElementById('lb-list')!;
+
+  init().catch((e) => (header.textContent = `Failed: ${(e as Error).message}`));
+  document.querySelectorAll('.window-btn').forEach((b) =>
+    b.addEventListener('click', () => loadLeaderboard((b as HTMLButtonElement).dataset.w!)),
+  );
+
+  async function init() {
+    const r = await fetch(`/api/v1/segments/${id}`, { credentials: 'include' });
+    if (!r.ok) {
+      header.innerHTML = `<h1 class="text-2xl font-bold">Not found</h1>`;
+      return;
+    }
+    const seg = (await r.json()) as { name: string; sport: string; distanceM: number };
+    header.innerHTML = `<p class="text-xs uppercase text-neutral-500">Segment</p>
+      <h1 class="text-2xl font-bold">${escape(seg.name)}</h1>
+      <p class="text-sm text-neutral-600 dark:text-neutral-400">${escape(seg.sport)} · ${(seg.distanceM / 1000).toFixed(2)} km</p>`;
+    await loadLeaderboard('all');
+  }
+
+  async function loadLeaderboard(w: string) {
+    const r = await fetch(`/api/v1/segments/${id}/leaderboard?window=${w}`, { credentials: 'include' });
+    if (!r.ok) return;
+    const body = (await r.json()) as { items: { handle: string; timeSeconds: number }[] };
+    list.innerHTML = '';
+    body.items.forEach((it, i) => {
+      const li = document.createElement('li');
+      li.className = 'rounded border border-neutral-200 px-3 py-1 dark:border-neutral-800';
+      li.innerHTML = `<strong>${i + 1}.</strong> ${escape(it.handle ?? '')} — ${formatTime(it.timeSeconds)}`;
+      list.appendChild(li);
+    });
+  }
+
+  function formatTime(s: number) {
+    const m = Math.floor(s / 60);
+    const ss = s % 60;
+    return `${m}:${String(ss).padStart(2, '0')}`;
+  }
+  function escape(s: string) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+</script>

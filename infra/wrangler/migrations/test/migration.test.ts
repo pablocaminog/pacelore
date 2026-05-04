@@ -26,6 +26,24 @@ function open(): DatabaseSyncT {
   return db;
 }
 
+const sql0002Path = join(__dirname, '..', '0002_api_keys.sql');
+
+function applyAll(db: DatabaseSyncT) {
+  db.exec(readFileSync(sqlPath, 'utf-8'));
+  db.exec(readFileSync(sql0002Path, 'utf-8'));
+}
+
+describe('migrations', () => {
+  it('0002 applies on top of 0001', () => {
+    const db = open();
+    applyAll(db);
+    const rows = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+      .all() as { name: string }[];
+    expect(rows.map((r) => r.name)).toContain('api_keys');
+  });
+});
+
 describe('0001_init.sql', () => {
   it('applies cleanly on an in-memory SQLite', () => {
     const db = open();
