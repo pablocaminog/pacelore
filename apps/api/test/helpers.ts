@@ -74,6 +74,7 @@ export class FakeD1 implements D1Database {
   credentials: Row[] = [];
   activities: Row[] = [];
   activityMetrics: Row[] = [];
+  follows: Row[] = [];
   pmcDaily: Map<string, Row> = new Map();
 
   prepare(sql: string): D1PreparedStatement {
@@ -260,6 +261,49 @@ export class FakeD1 implements D1Database {
           thrPace100: u.thrPace100 ?? null,
         },
       ];
+    }
+    if (trimmed.startsWith('SELECT id FROM users WHERE id')) {
+      const id = params[0];
+      const u = this.users.find((r) => r.id === id);
+      return u ? [{ id: u.id }] : [];
+    }
+    if (trimmed.startsWith('INSERT INTO follows')) {
+      const [follower_id, followee_id] = params;
+      const exists = this.follows.find(
+        (r) => r.follower_id === follower_id && r.followee_id === followee_id,
+      );
+      if (!exists) {
+        this.follows.push({ follower_id, followee_id, created_at: Math.floor(Date.now() / 1000) });
+      }
+      return [];
+    }
+    if (trimmed.startsWith('DELETE FROM follows')) {
+      const [follower_id, followee_id] = params;
+      this.follows = this.follows.filter(
+        (r) => !(r.follower_id === follower_id && r.followee_id === followee_id),
+      );
+      return [];
+    }
+    if (trimmed.includes('FROM follows f') && trimmed.includes('JOIN users u')) {
+      const isFollowers = trimmed.includes('f.followee_id = ?');
+      const filterId = params[0];
+      const cursor = params.length === 3 ? Number(params[1]) : null;
+      const limit = Number(params[params.length - 1]);
+      const edges = this.follows
+        .filter((r) => (isFollowers ? r.followee_id === filterId : r.follower_id === filterId))
+        .filter((r) => (cursor != null ? Number(r.created_at) < cursor : true))
+        .sort((a, b) => Number(b.created_at) - Number(a.created_at))
+        .slice(0, limit);
+      return edges.map((edge) => {
+        const userId = isFollowers ? edge.follower_id : edge.followee_id;
+        const u = this.users.find((r) => r.id === userId);
+        return {
+          id: u?.id,
+          handle: u?.handle,
+          displayName: u?.displayName ?? null,
+          createdAt: edge.created_at,
+        };
+      });
     }
     if (trimmed.startsWith('SELECT date, tss FROM pmc_daily')) {
       const athleteId = params[0];
