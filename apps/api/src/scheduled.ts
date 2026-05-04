@@ -6,7 +6,7 @@
  *     ~120 days of TSS rows, written back as a batch.
  */
 
-import { pmcDaily } from '@open-strava/metrics';
+import { pmcDaily } from '@pacelore/metrics';
 import type { Env } from './env.js';
 
 export async function scheduledHandler(

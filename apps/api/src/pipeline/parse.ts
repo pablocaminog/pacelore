@@ -3,7 +3,7 @@
  * Returns the normalized ActivityRecord regardless of source format.
  */
 
-import { decode, parseGpx, parseTcx, type ActivityRecord } from '@open-strava/fit-parser';
+import { decode, parseGpx, parseTcx, type ActivityRecord } from '@pacelore/fit-parser';
 import type { IngestJob } from '../env.js';
 
 export async function parseRaw(job: IngestJob, raw: ArrayBuffer): Promise<ActivityRecord> {

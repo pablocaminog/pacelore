@@ -2,7 +2,7 @@
  * Model Context Protocol (MCP) server — JSON-RPC 2.0 over HTTP.
  *
  * Exposes a curated tool surface so an agentic AI can read + act on
- * the user's open-strava data. Authentication is via the same
+ * the user's pacelore data. Authentication is via the same
  * X-Api-Key header used by the public REST API. The agent's effective
  * user is the API key's owner; scope checks on each tool.
  *
@@ -27,7 +27,7 @@ type Ctx = Context<{ Bindings: Env; Variables: ApiKeyVariables }>;
 export const mcpRoutes = new Hono<{ Bindings: Env; Variables: ApiKeyVariables }>();
 
 const SERVER_INFO = {
-  name: 'open-strava',
+  name: 'pacelore',
   version: '0.1.0',
 };
 
@@ -199,7 +199,7 @@ mcpRoutes.post('/', async (c) => {
         id,
         result: {
           resources: (activities.results ?? []).map((a) => ({
-            uri: `open-strava://activities/${a.id}`,
+            uri: `pacelore://activities/${a.id}`,
             name:
               a.name ?? `${a.sport} ${new Date(a.started_at * 1000).toISOString().slice(0, 10)}`,
             mimeType: 'application/json',
@@ -209,7 +209,7 @@ mcpRoutes.post('/', async (c) => {
     }
     if (method === 'resources/read') {
       const uri = String(params.uri ?? '');
-      const m = uri.match(/^open-strava:\/\/activities\/([^/]+)$/);
+      const m = uri.match(/^pacelore:\/\/activities\/([^/]+)$/);
       if (!m) return jsonRpcError(c, id, -32602, 'unsupported uri');
       return runTool(c, id, 'get_activity', { id: m[1]! });
     }

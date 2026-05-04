@@ -9,7 +9,7 @@
 
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import { pmcDaily } from '@open-strava/metrics';
+import { pmcDaily } from '@pacelore/metrics';
 import type { Env } from '../env.js';
 import { requireSession, type AuthVariables } from '../middleware/auth.js';
 

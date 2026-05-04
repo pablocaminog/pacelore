@@ -8,5 +8,5 @@ build/
 coverage/
 pnpm-lock.yaml
 LICENSE
-STRAVA_ALT_ARCHITECTURE.md
+ARCHITECTURE.md
 *.min.*

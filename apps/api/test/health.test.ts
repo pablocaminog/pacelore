@@ -37,7 +37,7 @@ describe('API worker', () => {
     const res = await app.request('/', {}, fakeEnv());
     expect(res.status).toBe(200);
     const body = (await res.json()) as { name: string; env: string };
-    expect(body.name).toBe('open-strava-api');
+    expect(body.name).toBe('pacelore-api');
     expect(body.env).toBe('dev');
   });
 

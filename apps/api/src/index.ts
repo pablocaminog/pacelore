@@ -1,5 +1,5 @@
 /**
- * open-strava API worker.
+ * pacelore API worker.
  *
  * Hono router. Domain routes attach in `buildApp`.
  */
@@ -32,9 +32,9 @@ export function buildApp(): Hono<{ Bindings: Env }> {
 
   app.get('/', (c) =>
     c.json({
-      name: 'open-strava-api',
+      name: 'pacelore-api',
       env: c.env.ENV,
-      docs: 'https://github.com/pablocaminog/open-strava',
+      docs: 'https://github.com/pablocaminog/pacelore',
     }),
   );
 

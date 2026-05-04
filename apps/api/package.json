@@ -1,5 +1,5 @@
 {
-  "name": "@open-strava/api",
+  "name": "@pacelore/api",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,9 +11,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@open-strava/fit-parser": "workspace:*",
-    "@open-strava/metrics": "workspace:*",
-    "@open-strava/segments": "workspace:*",
+    "@pacelore/fit-parser": "workspace:*",
+    "@pacelore/metrics": "workspace:*",
+    "@pacelore/segments": "workspace:*",
     "@simplewebauthn/server": "11.0.0",
     "@simplewebauthn/types": "11.0.0",
     "hono": "4.6.10"

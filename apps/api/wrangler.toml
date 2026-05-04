@@ -1,29 +1,29 @@
-name = "open-strava-api"
+name = "pacelore-api"
 main = "src/index.ts"
 compatibility_date = "2025-12-01"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
-# D1 — relational store. Run `pnpm wrangler d1 create open-strava` and
+# D1 — relational store. Run `pnpm wrangler d1 create pacelore` and
 # paste the returned ID into `database_id`.
 [[d1_databases]]
 binding = "DB"
-database_name = "open-strava"
+database_name = "pacelore"
 database_id = "REPLACE_WITH_D1_ID"
 migrations_dir = "../../infra/wrangler/migrations"
 
 # R2 — raw FIT/TCX/GPX, parsed JSON, generated images.
 [[r2_buckets]]
 binding = "RAW_BUCKET"
-bucket_name = "open-strava-raw"
+bucket_name = "pacelore-raw"
 
 [[r2_buckets]]
 binding = "PARSED_BUCKET"
-bucket_name = "open-strava-parsed"
+bucket_name = "pacelore-parsed"
 
 [[r2_buckets]]
 binding = "EXPORTS_BUCKET"
-bucket_name = "open-strava-exports"
+bucket_name = "pacelore-exports"
 
 # KV — sessions, hot leaderboard slices, feed slices.
 [[kv_namespaces]]
@@ -55,7 +55,7 @@ dead_letter_queue = "activity-ingest-dlq"
 # - Set `wrangler secret put STRAVA_CLIENT_SECRET` etc. before enabling Strava import.
 [vars]
 ENV = "dev"
-APP_ORIGIN = "https://open-strava.pages.dev"
+APP_ORIGIN = "https://pacelore.pages.dev"
 
 # Durable Objects (live group rides) wired in a future phase.
 # [[durable_objects.bindings]]

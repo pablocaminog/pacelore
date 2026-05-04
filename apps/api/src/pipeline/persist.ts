@@ -6,8 +6,8 @@
  * retry, which is fine since it's a deterministic function of the input.
  */
 
-import type { ActivityRecord } from '@open-strava/fit-parser';
-import { findSegmentEfforts, type ActivityPoint, type Segment } from '@open-strava/segments';
+import type { ActivityRecord } from '@pacelore/fit-parser';
+import { findSegmentEfforts, type ActivityPoint, type Segment } from '@pacelore/segments';
 import type { Env, IngestJob } from '../env.js';
 import type { ActivitySummary, MetricKv } from './metrics.js';
 import { uuidv7 } from '../util/uuid.js';

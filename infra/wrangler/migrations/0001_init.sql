@@ -1,4 +1,4 @@
--- 0001_init.sql — initial open-strava schema.
+-- 0001_init.sql — initial pacelore schema.
 --
 -- Conventions:
 --   - All ids are TEXT (UUIDv7) — sortable by creation time.

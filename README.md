@@ -1,4 +1,4 @@
-# open-strava
+# pacelore
 
 Open-source training platform. Web + mobile companion. Pulls activities from Garmin / Apple Watch / iPhone HealthKit / FIT-TCX-GPX upload. Strava-style social feed + segments + leaderboards. TrainingPeaks-style PMC / CTL / ATL / TSB charts.
 
@@ -41,7 +41,7 @@ infra/
 
 ## Status
 
-Phase 0 — proof. See `STRAVA_ALT_ARCHITECTURE.md` for full architecture.
+Phase 0 — proof. See `ARCHITECTURE.md` for full architecture.
 
 ## License
 
@@ -49,4 +49,4 @@ AGPL-3.0. See `LICENSE`.
 
 ## Trademark notice
 
-"Strava" is a registered trademark of Strava, Inc. This project is not affiliated with, endorsed by, or sponsored by Strava, Inc. The name `open-strava` is a placeholder pending rename.
+"Strava" is a registered trademark of Strava, Inc. This project is not affiliated with, endorsed by, or sponsored by Strava, Inc. The name `pacelore` is a placeholder pending rename.

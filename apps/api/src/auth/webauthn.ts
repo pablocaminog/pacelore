@@ -30,7 +30,7 @@ export interface RpConfig {
 
 export function rpFromOrigin(origin: string): RpConfig {
   const u = new URL(origin);
-  return { rpId: u.hostname, rpName: 'open-strava', origin };
+  return { rpId: u.hostname, rpName: 'pacelore', origin };
 }
 
 const CHALLENGE_TTL_SECONDS = 5 * 60;

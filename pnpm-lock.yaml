@@ -29,13 +29,13 @@ importers:
 
   apps/api:
     dependencies:
-      '@open-strava/fit-parser':
+      '@pacelore/fit-parser':
         specifier: workspace:*
         version: link:../../packages/fit-parser
-      '@open-strava/metrics':
+      '@pacelore/metrics':
         specifier: workspace:*
         version: link:../../packages/metrics
-      '@open-strava/segments':
+      '@pacelore/segments':
         specifier: workspace:*
         version: link:../../packages/segments
       '@simplewebauthn/server':

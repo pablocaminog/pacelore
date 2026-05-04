@@ -1,14 +1,14 @@
 {
-  "name": "open-strava",
+  "name": "pacelore",
   "version": "0.0.0",
   "private": true,
   "description": "Open-source training platform — Strava + TrainingPeaks alternative on Cloudflare.",
   "license": "AGPL-3.0-only",
   "author": "Pablo Caminog <pcaminog@gmail.com>",
-  "homepage": "https://github.com/pablocaminog/open-strava",
+  "homepage": "https://github.com/pablocaminog/pacelore",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pablocaminog/open-strava.git"
+    "url": "git+https://github.com/pablocaminog/pacelore.git"
   },
   "type": "module",
   "engines": {
@@ -24,8 +24,8 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "dev:web": "pnpm --filter @open-strava/web dev",
-    "dev:api": "pnpm --filter @open-strava/api dev"
+    "dev:web": "pnpm --filter @pacelore/web dev",
+    "dev:api": "pnpm --filter @pacelore/api dev"
   },
   "devDependencies": {
     "@eslint/js": "9.15.0",

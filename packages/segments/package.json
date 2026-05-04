@@ -1,5 +1,5 @@
 {
-  "name": "@open-strava/segments",
+  "name": "@pacelore/segments",
   "version": "0.0.0",
   "private": true,
   "description": "Segment matching — bbox prefilter + DTW polyline match.",

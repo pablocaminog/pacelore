@@ -6,7 +6,7 @@
  * (peak curves, time-in-zone, etc.).
  */
 
-import type { ActivityRecord } from '@open-strava/fit-parser';
+import type { ActivityRecord } from '@pacelore/fit-parser';
 import {
   DEFAULT_PEAK_WINDOWS,
   paceMetrics,
@@ -17,7 +17,7 @@ import {
   type HrSample,
   type PaceSample,
   type PowerSample,
-} from '@open-strava/metrics';
+} from '@pacelore/metrics';
 
 export interface AthleteThresholds {
   ftp?: number;

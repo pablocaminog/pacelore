@@ -12,7 +12,7 @@
 
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import { bboxOf, type LatLng } from '@open-strava/segments';
+import { bboxOf, type LatLng } from '@pacelore/segments';
 import type { Env } from '../env.js';
 import { requireSession, type AuthVariables } from '../middleware/auth.js';
 import { uuidv7 } from '../util/uuid.js';
