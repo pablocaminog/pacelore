@@ -38,6 +38,11 @@ id = "REPLACE_WITH_KV_LEADERBOARDS_ID"
 binding = "KV_FEED"
 id = "REPLACE_WITH_KV_FEED_ID"
 
+# Cloudflare Email Service — outbound transactional email.
+# Domain pacelore.com (verified at account level).
+[[send_email]]
+name = "EMAIL"
+
 # Queues — async ingest pipeline.
 [[queues.producers]]
 queue = "activity-ingest"

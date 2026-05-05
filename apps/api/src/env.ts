@@ -16,10 +16,11 @@ export interface Env {
   GARMIN_CONSUMER_SECRET?: string;
   ARWEAVE_TURBO_TOKEN?: string;
   ATPROTO_PDS_URL?: string;
-  /** Resend API key for transactional email. Optional in dev. */
-  RESEND_API_KEY?: string;
   /** Default `From` value, e.g. "PaceLore <noreply@notifications.pacelore.com>". */
   EMAIL_FROM?: string;
+
+  /** Cloudflare Email Service binding (outbound transactional). */
+  EMAIL?: EmailSendBinding;
 
   // Storage
   DB: D1Database;
@@ -34,6 +35,22 @@ export interface Env {
 
   // Queues
   INGEST_QUEUE: Queue<IngestJob>;
+}
+
+/**
+ * Cloudflare Email Service binding shape (`send_email` in wrangler).
+ * Mirrors the documented `env.EMAIL.send(...)` API.
+ */
+export interface EmailSendBinding {
+  send(message: {
+    to: string | string[];
+    from: string;
+    subject: string;
+    html?: string;
+    text?: string;
+    reply_to?: string;
+    headers?: Record<string, string>;
+  }): Promise<unknown>;
 }
 
 export interface IngestJob {

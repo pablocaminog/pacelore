@@ -34,6 +34,7 @@
     { "binding": "KV_LEADERBOARDS", "id": "77f5cb560b6f4f6abcdbd18f0769964b" },
     { "binding": "KV_FEED", "id": "867c1cdbbb7c4b2faea48caf690c3558" },
   ],
+  "send_email": [{ "name": "EMAIL" }],
   "queues": {
     "producers": [{ "queue": "activity-ingest", "binding": "INGEST_QUEUE" }],
     "consumers": [

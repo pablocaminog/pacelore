@@ -1,17 +1,12 @@
 /**
- * Transactional email sender.
+ * Transactional email sender — Cloudflare Email Service.
  *
- * Provider: Resend (https://resend.com). Reasons:
- *   - clean REST API, single-call send
- *   - works fine from a Cloudflare Worker (no SMTP)
- *   - DKIM/SPF setup happens once on the sending subdomain
+ *   Binding: `EMAIL` (configured in wrangler as `send_email`).
+ *   Sender:  pacelore.com (verified at the account level).
  *
- * Sending domain: notifications.pacelore.com — verified separately
- * with Resend (TXT + DKIM CNAMEs added on the zone).
- *
- * If RESEND_API_KEY is unset (e.g. local dev) this module logs and
- * returns ok=false instead of throwing so callers don't have to
- * wrap every send in try/catch.
+ * Falls back to a no-op + console warning when the binding is missing
+ * (local `astro dev` without the worker running, or a fresh deploy
+ * before the binding is wired). Caller never has to wrap a try/catch.
  */
 
 import type { Env } from '../env.js';
@@ -23,57 +18,45 @@ export interface EmailRequest {
   text: string;
   /** Optional reply-to address. Defaults to the from address. */
   replyTo?: string;
-  /** Stable identifier used for idempotency (Resend de-dups). */
+  /** Stable identifier; passed through as the Message-ID header so a
+   * retry deterministically lands as the same message. */
   idempotencyKey?: string;
 }
 
 export interface EmailResult {
   ok: boolean;
-  id?: string;
   error?: string;
 }
 
-const RESEND_URL = 'https://api.resend.com/emails';
-
 export async function sendEmail(env: Env, req: EmailRequest): Promise<EmailResult> {
-  if (!env.RESEND_API_KEY) {
-    console.warn('email skipped (RESEND_API_KEY not set)', { to: req.to, subject: req.subject });
-    return { ok: false, error: 'email provider not configured' };
-  }
-  const from =
-    env.EMAIL_FROM ?? 'PaceLore <noreply@notifications.pacelore.com>';
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${env.RESEND_API_KEY}`,
-  };
-  if (req.idempotencyKey) headers['Idempotency-Key'] = req.idempotencyKey;
-
-  try {
-    const res = await fetch(RESEND_URL, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        from,
-        to: [req.to],
-        subject: req.subject,
-        html: req.html,
-        text: req.text,
-        reply_to: req.replyTo ?? from,
-        headers: {
-          'List-Unsubscribe': `<${env.APP_ORIGIN.replace(/\/$/, '')}/settings>`,
-          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
-        },
-      }),
+  if (!env.EMAIL) {
+    console.warn('email skipped (EMAIL binding not configured)', {
+      to: req.to,
+      subject: req.subject,
     });
-    if (!res.ok) {
-      const detail = await res.text().catch(() => '');
-      console.warn('email send failed', res.status, detail);
-      return { ok: false, error: `HTTP ${res.status}` };
-    }
-    const body = (await res.json()) as { id?: string };
-    return body.id ? { ok: true, id: body.id } : { ok: true };
+    return { ok: false, error: 'email binding not configured' };
+  }
+  const from = env.EMAIL_FROM ?? 'PaceLore <noreply@pacelore.com>';
+  const headers: Record<string, string> = {
+    'List-Unsubscribe': `<${env.APP_ORIGIN.replace(/\/$/, '')}/settings>`,
+    'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+  };
+  if (req.idempotencyKey) {
+    headers['Message-ID'] = `<${req.idempotencyKey}@pacelore.com>`;
+  }
+  try {
+    await env.EMAIL.send({
+      from,
+      to: req.to,
+      subject: req.subject,
+      html: req.html,
+      text: req.text,
+      reply_to: req.replyTo ?? from,
+      headers,
+    });
+    return { ok: true };
   } catch (err) {
-    console.warn('email send threw', err);
+    console.warn('email send failed', err);
     return { ok: false, error: (err as Error).message };
   }
 }
