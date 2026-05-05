@@ -4,6 +4,7 @@
   // Paths are relative to this file.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "pacelore-api",
+  "account_id": "72b9ea77edd80936fb97de334621368b",
   "main": "apps/api/src/index.ts",
   "compatibility_date": "2025-12-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -12,14 +13,14 @@
     "command": "pnpm install --frozen-lockfile=false && pnpm --filter @pacelore/api typecheck",
   },
   "vars": {
-    "ENV": "dev",
+    "ENV": "production",
     "APP_ORIGIN": "https://pacelore.pages.dev",
   },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "pacelore",
-      "database_id": "REPLACE_WITH_D1_ID",
+      "database_id": "2070e24f-b8dd-4d71-b1b9-6a824ac883f5",
       "migrations_dir": "infra/wrangler/migrations",
     },
   ],
@@ -29,9 +30,9 @@
     { "binding": "EXPORTS_BUCKET", "bucket_name": "pacelore-exports" },
   ],
   "kv_namespaces": [
-    { "binding": "KV_SESSIONS", "id": "REPLACE_WITH_KV_SESSIONS_ID" },
-    { "binding": "KV_LEADERBOARDS", "id": "REPLACE_WITH_KV_LEADERBOARDS_ID" },
-    { "binding": "KV_FEED", "id": "REPLACE_WITH_KV_FEED_ID" },
+    { "binding": "KV_SESSIONS", "id": "bec561a091284c2893c74433bc5aea81" },
+    { "binding": "KV_LEADERBOARDS", "id": "77f5cb560b6f4f6abcdbd18f0769964b" },
+    { "binding": "KV_FEED", "id": "867c1cdbbb7c4b2faea48caf690c3558" },
   ],
   "queues": {
     "producers": [{ "queue": "activity-ingest", "binding": "INGEST_QUEUE" }],
