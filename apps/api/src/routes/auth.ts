@@ -14,6 +14,8 @@ import { HTTPException } from 'hono/http-exception';
 import type { Env } from '../env.js';
 import { sendEmail } from '../integrations/email.js';
 import { welcomeEmail } from '../integrations/email-templates.js';
+import { rateLimit, clientIp } from '../middleware/ratelimit.js';
+import { logAuthEvent } from '../db/authEvents.js';
 import {
   bumpCredentialCounter,
   createUser,
@@ -36,9 +38,13 @@ import { uuidv7 } from '../util/uuid.js';
 export const authRoutes = new Hono<{ Bindings: Env }>();
 
 authRoutes.post('/auth/register/options', async (c) => {
+  const ip = clientIp(c.req.raw);
+  await enforceRate(c.env, `register:${ip}`, 5, 60); // 5 req / minute / IP
+  await enforceRate(c.env, `register:${ip}:hour`, 20, 60 * 60); // 20 / hour / IP
+
   const body = await readJson<{ handle?: string; email?: string }>(c.req.raw);
   const handle = body.handle?.trim();
-  const email = body.email?.trim().toLowerCase();
+  const email = normalizeEmail(body.email);
   if (!handle || !email) throw new HTTPException(400, { message: 'handle and email required' });
   if (!isValidHandle(handle)) throw new HTTPException(400, { message: 'invalid handle' });
   if (!isValidEmail(email)) throw new HTTPException(400, { message: 'invalid email' });
@@ -76,6 +82,9 @@ authRoutes.post('/auth/register/options', async (c) => {
 });
 
 authRoutes.post('/auth/register/verify', async (c) => {
+  const ip = clientIp(c.req.raw);
+  await enforceRate(c.env, `register-verify:${ip}`, 10, 60);
+
   const body = await readJson<{
     challengeId?: string;
     userId?: string;
@@ -95,6 +104,19 @@ authRoutes.post('/auth/register/verify', async (c) => {
     counter: verified.counter,
     ...(verified.transports ? { transports: verified.transports as string[] } : {}),
     ...(body.deviceName ? { deviceName: body.deviceName } : {}),
+  });
+  await logAuthEvent(c.env, {
+    kind: 'credential_added',
+    athleteId: body.userId,
+    detail: 'register',
+    ip,
+    userAgent: c.req.header('user-agent') ?? null,
+  });
+  await logAuthEvent(c.env, {
+    kind: 'register',
+    athleteId: body.userId,
+    ip,
+    userAgent: c.req.header('user-agent') ?? null,
   });
 
   const { cookie } = await createSession(c.env, body.userId);
@@ -128,46 +150,107 @@ authRoutes.post('/auth/register/verify', async (c) => {
 });
 
 authRoutes.post('/auth/login/options', async (c) => {
+  const ip = clientIp(c.req.raw);
+  await enforceRate(c.env, `login-options:${ip}`, 10, 60);
+
   const body = await readJson<{ email?: string }>(c.req.raw);
   const rp = rpFromOrigin(c.env.APP_ORIGIN);
 
+  // Anti-enumeration: always issue a challenge. When the email maps to
+  // a real account, populate allowCredentials so the browser can offer
+  // the right passkey; otherwise return empty allowCredentials. Either
+  // way the response shape and timing are equivalent, so an attacker
+  // can't probe whether the account exists from this endpoint.
   let allowCredentialIds: string[] = [];
   let userId: string | undefined;
-  if (body.email) {
-    const user = await findUserByEmail(c.env, body.email.toLowerCase());
-    if (!user) throw new HTTPException(404, { message: 'no account for that email' });
-    userId = user.id;
-    const creds = await listCredentialsForUser(c.env, user.id);
-    allowCredentialIds = creds.map((cr) => cr.id);
+  const email = normalizeEmail(body.email);
+  if (email && isValidEmail(email)) {
+    const user = await findUserByEmail(c.env, email);
+    if (user) {
+      userId = user.id;
+      const creds = await listCredentialsForUser(c.env, user.id);
+      allowCredentialIds = creds.map((cr) => cr.id);
+    }
   }
   const { challengeId, options } = await startAuthentication(c.env, rp, allowCredentialIds, userId);
   return c.json({ challengeId, options });
 });
 
 authRoutes.post('/auth/login/verify', async (c) => {
+  const ip = clientIp(c.req.raw);
+  const ua = c.req.header('user-agent') ?? null;
+  // Tighter limit: actual auth attempts. Rejects credential-stuffing
+  // even before we touch the DB.
+  await enforceRate(c.env, `login-verify:${ip}`, 10, 60);
+  await enforceRate(c.env, `login-verify:${ip}:hour`, 60, 60 * 60);
+
   const body = await readJson<{ challengeId?: string; response?: { id?: string } }>(c.req.raw);
   if (!body.challengeId || !body.response?.id) {
+    await logAuthEvent(c.env, { kind: 'login_fail', detail: 'missing_fields', ip, userAgent: ua });
     throw new HTTPException(400, { message: 'missing required fields' });
   }
   const cred = await findCredentialById(c.env, body.response.id);
-  if (!cred) throw new HTTPException(401, { message: 'unknown credential' });
+  if (!cred) {
+    await logAuthEvent(c.env, {
+      kind: 'login_fail',
+      detail: 'unknown_credential',
+      ip,
+      userAgent: ua,
+    });
+    throw new HTTPException(401, { message: 'unknown credential' });
+  }
 
   const rp = rpFromOrigin(c.env.APP_ORIGIN);
-  const verified = await finishAuthentication(c.env, rp, body.challengeId, body.response as never, {
-    id: cred.id,
-    publicKey: new Uint8Array(cred.public_key),
-    counter: cred.counter,
-  });
+  let verified;
+  try {
+    verified = await finishAuthentication(c.env, rp, body.challengeId, body.response as never, {
+      id: cred.id,
+      publicKey: new Uint8Array(cred.public_key),
+      counter: cred.counter,
+    });
+  } catch (err) {
+    await logAuthEvent(c.env, {
+      kind: 'login_fail',
+      athleteId: cred.user_id,
+      detail: (err as Error).message?.slice(0, 120) ?? 'verify_failed',
+      ip,
+      userAgent: ua,
+    });
+    throw new HTTPException(401, { message: 'authentication failed' });
+  }
+
+  // Replay defence: WebAuthn counter must strictly advance unless the
+  // authenticator never issues counters (i.e. both sides stay at 0).
+  if (verified.newCounter !== 0 && verified.newCounter <= cred.counter) {
+    await logAuthEvent(c.env, {
+      kind: 'login_fail',
+      athleteId: cred.user_id,
+      detail: 'counter_replay',
+      ip,
+      userAgent: ua,
+    });
+    throw new HTTPException(401, { message: 'authenticator counter regression' });
+  }
   await bumpCredentialCounter(c.env, cred.id, verified.newCounter);
 
   const { cookie } = await createSession(c.env, cred.user_id);
   c.header('Set-Cookie', cookie);
+  await logAuthEvent(c.env, { kind: 'login_ok', athleteId: cred.user_id, ip, userAgent: ua });
   return c.json({ ok: true, userId: cred.user_id });
 });
 
 authRoutes.post('/auth/logout', async (c) => {
+  const session = await loadSession(c.env, c.req.header('Cookie') ?? null);
   const cookie = await destroySession(c.env, c.req.header('Cookie') ?? null);
   c.header('Set-Cookie', cookie);
+  if (session) {
+    await logAuthEvent(c.env, {
+      kind: 'logout',
+      athleteId: session.userId,
+      ip: clientIp(c.req.raw),
+      userAgent: c.req.header('user-agent') ?? null,
+    });
+  }
   return c.json({ ok: true });
 });
 
@@ -194,8 +277,28 @@ function isValidHandle(s: string): boolean {
   return /^[a-zA-Z0-9_-]{2,32}$/.test(s);
 }
 
-function isValidEmail(s: string): boolean {
+function isValidEmail(s: string | undefined): s is string {
+  if (!s) return false;
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) && s.length <= 254;
+}
+
+function normalizeEmail(s: string | undefined | null): string | undefined {
+  if (!s) return undefined;
+  return s.trim().toLowerCase();
+}
+
+async function enforceRate(
+  env: Env,
+  key: string,
+  max: number,
+  windowSec: number,
+): Promise<void> {
+  const r = await rateLimit(env, key, max, windowSec);
+  if (!r.ok) {
+    throw new HTTPException(429, {
+      message: `too many requests, try again in ${r.retryAfter}s`,
+    });
+  }
 }
 
 void SESSION_COOKIE;

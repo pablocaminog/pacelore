@@ -16,6 +16,8 @@ import { requireSession, type AuthVariables } from '../middleware/auth.js';
 import { mintApiKey } from '../auth/apiKey.js';
 import { sendEmail } from '../integrations/email.js';
 import { accountDeletedEmail } from '../integrations/email-templates.js';
+import { logAuthEvent } from '../db/authEvents.js';
+import { clientIp } from '../middleware/ratelimit.js';
 
 export const settingsRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 settingsRoutes.use('*', requireSession());
@@ -131,6 +133,12 @@ settingsRoutes.delete('/me', async (c) => {
   }
 
   await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(session.userId).run();
+  await logAuthEvent(c.env, {
+    kind: 'account_delete',
+    athleteId: session.userId,
+    ip: clientIp(c.req.raw),
+    userAgent: c.req.header('user-agent') ?? null,
+  });
 
   // Best-effort goodbye email. After this point the row is gone so we
   // can't recover the address — captured above.

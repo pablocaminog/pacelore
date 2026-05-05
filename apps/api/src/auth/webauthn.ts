@@ -77,7 +77,7 @@ export async function startRegistration(
     excludeCredentials: excludeCredentialIds.map((id) => ({ id })),
     authenticatorSelection: {
       residentKey: 'preferred',
-      userVerification: 'preferred',
+      userVerification: 'required',
     },
   });
   const challengeId = await storeChallenge(env, { challenge: options.challenge, userId: user.id });
@@ -104,7 +104,7 @@ export async function finishRegistration(
     expectedChallenge: ch.challenge,
     expectedOrigin: rp.origin,
     expectedRPID: rp.rpId,
-    requireUserVerification: false,
+    requireUserVerification: true,
   });
   if (!verification.verified || !verification.registrationInfo) {
     throw new Error('registration not verified');
@@ -166,7 +166,7 @@ export async function finishAuthentication(
       publicKey: credential.publicKey,
       counter: credential.counter,
     },
-    requireUserVerification: false,
+    requireUserVerification: true,
   });
   if (!verification.verified) throw new Error('authentication not verified');
   return {
