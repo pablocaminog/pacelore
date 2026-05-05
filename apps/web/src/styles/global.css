@@ -151,7 +151,7 @@
   --fg:         oklch(0.965 0.005 70);
   --fg-muted:   oklch(0.700 0.010 60);
   --fg-subtle:  oklch(0.560 0.012 60);
-  --fg-on-pace: var(--ink-0);
+  --fg-on-pace: var(--ink-950);
   --fg-inverse: var(--ink-900);
 
   --border:        oklch(0.245 0.010 50);
@@ -177,7 +177,7 @@
     --fg:         oklch(0.965 0.005 70);
     --fg-muted:   oklch(0.700 0.010 60);
     --fg-subtle:  oklch(0.560 0.012 60);
-    --fg-on-pace: var(--ink-0);
+    --fg-on-pace: var(--ink-950);
     --fg-inverse: var(--ink-900);
 
     --border:        oklch(0.245 0.010 50);
