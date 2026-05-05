@@ -12,6 +12,8 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { Env } from '../env.js';
+import { sendEmail } from '../integrations/email.js';
+import { welcomeEmail } from '../integrations/email-templates.js';
 import {
   bumpCredentialCounter,
   createUser,
@@ -78,6 +80,31 @@ authRoutes.post('/auth/register/verify', async (c) => {
 
   const { cookie } = await createSession(c.env, body.userId);
   c.header('Set-Cookie', cookie);
+
+  // Fire welcome email (best-effort).
+  try {
+    const user = await c.env.DB.prepare(
+      `SELECT email, handle, display_name AS displayName FROM users WHERE id = ?`,
+    )
+      .bind(body.userId)
+      .first<{ email: string; handle: string; displayName: string | null }>();
+    if (user) {
+      const tpl = welcomeEmail({
+        appOrigin: c.env.APP_ORIGIN,
+        athlete: { handle: user.handle, displayName: user.displayName },
+      });
+      await sendEmail(c.env, {
+        to: user.email,
+        subject: tpl.subject,
+        html: tpl.html,
+        text: tpl.text,
+        idempotencyKey: `welcome:${body.userId}`,
+      });
+    }
+  } catch (err) {
+    console.warn('welcome email failed', err);
+  }
+
   return c.json({ ok: true, userId: body.userId });
 });
 

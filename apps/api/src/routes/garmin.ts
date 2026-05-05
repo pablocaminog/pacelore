@@ -27,6 +27,7 @@ import type { Env, IngestJob } from '../env.js';
 import { requireSession, type AuthVariables } from '../middleware/auth.js';
 import { parseFormBody, signOAuth1 } from '../integrations/oauth1.js';
 import { uuidv7 } from '../util/uuid.js';
+import { sendImportDoneEmail } from './strava.js';
 
 export const garminRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
@@ -383,6 +384,12 @@ export async function garminTickOnce(env: Env, jobId: string): Promise<void> {
       job.id,
     )
     .run();
+
+  if (status === 'done') {
+    await sendImportDoneEmail(env, job.athlete_id, 'garmin', succeeded, duplicates, failed).catch(
+      () => {},
+    );
+  }
 }
 
 async function markGarminError(env: Env, jobId: string, message: string) {

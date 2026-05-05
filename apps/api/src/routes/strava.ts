@@ -26,6 +26,8 @@ import { HTTPException } from 'hono/http-exception';
 import type { Env, IngestJob } from '../env.js';
 import { requireSession, type AuthVariables } from '../middleware/auth.js';
 import { uuidv7 } from '../util/uuid.js';
+import { sendEmail } from '../integrations/email.js';
+import { importDoneEmail } from '../integrations/email-templates.js';
 
 export const stravaRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
@@ -367,6 +369,43 @@ export async function stravaTickOnce(env: Env, jobId: string): Promise<void> {
       job.id,
     )
     .run();
+
+  if (status === 'done') {
+    await sendImportDoneEmail(env, job.athlete_id, 'strava', succeeded, duplicates, failed).catch(
+      () => {},
+    );
+  }
+}
+
+export async function sendImportDoneEmail(
+  env: Env,
+  athleteId: string,
+  provider: 'strava' | 'garmin',
+  succeeded: number,
+  duplicates: number,
+  failed: number,
+): Promise<void> {
+  const user = await env.DB.prepare(
+    `SELECT email, handle, display_name AS displayName FROM users WHERE id = ?`,
+  )
+    .bind(athleteId)
+    .first<{ email: string; handle: string; displayName: string | null }>();
+  if (!user) return;
+  const tpl = importDoneEmail({
+    appOrigin: env.APP_ORIGIN,
+    athlete: { handle: user.handle, displayName: user.displayName },
+    provider,
+    succeeded,
+    duplicates,
+    failed,
+  });
+  await sendEmail(env, {
+    to: user.email,
+    subject: tpl.subject,
+    html: tpl.html,
+    text: tpl.text,
+    idempotencyKey: `import-done:${provider}:${athleteId}:${succeeded}`,
+  });
 }
 
 interface StravaSummary {

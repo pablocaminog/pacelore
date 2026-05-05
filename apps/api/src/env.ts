@@ -16,6 +16,10 @@ export interface Env {
   GARMIN_CONSUMER_SECRET?: string;
   ARWEAVE_TURBO_TOKEN?: string;
   ATPROTO_PDS_URL?: string;
+  /** Resend API key for transactional email. Optional in dev. */
+  RESEND_API_KEY?: string;
+  /** Default `From` value, e.g. "PaceLore <noreply@notifications.pacelore.com>". */
+  EMAIL_FROM?: string;
 
   // Storage
   DB: D1Database;

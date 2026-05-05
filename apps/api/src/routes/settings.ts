@@ -1,11 +1,12 @@
 /**
- * Athlete settings + API keys.
+ * Athlete settings + API keys + account close.
  *
- *   GET  /api/v1/me/settings
- *   PATCH /api/v1/me/settings
- *   GET  /api/v1/me/api-keys
- *   POST /api/v1/me/api-keys     { name, scopes: ["read:activities",…] }
+ *   GET    /api/v1/me/settings
+ *   PATCH  /api/v1/me/settings
+ *   GET    /api/v1/me/api-keys
+ *   POST   /api/v1/me/api-keys     { name, scopes: ["read:activities",…] }
  *   DELETE /api/v1/me/api-keys/:id
+ *   DELETE /api/v1/me               { confirm: handle }   — close account
  */
 
 import { Hono } from 'hono';
@@ -13,6 +14,8 @@ import { HTTPException } from 'hono/http-exception';
 import type { Env } from '../env.js';
 import { requireSession, type AuthVariables } from '../middleware/auth.js';
 import { mintApiKey } from '../auth/apiKey.js';
+import { sendEmail } from '../integrations/email.js';
+import { accountDeletedEmail } from '../integrations/email-templates.js';
 
 export const settingsRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 settingsRoutes.use('*', requireSession());
@@ -104,5 +107,53 @@ settingsRoutes.delete('/me/api-keys/:id', async (c) => {
   )
     .bind(id, session.userId)
     .run();
+  return c.json({ ok: true });
+});
+
+/**
+ * Close account. Requires `?confirm=<handle>` in the request body so a
+ * stray double-click can't nuke an athlete's data. Cascading FK rules
+ * on the schema take care of activities, comments, follows, etc.
+ */
+settingsRoutes.delete('/me', async (c) => {
+  const session = c.get('session');
+  const body = await c.req.json().catch(() => ({})) as { confirm?: string };
+  const user = await c.env.DB.prepare(
+    `SELECT email, handle, display_name AS displayName FROM users WHERE id = ?`,
+  )
+    .bind(session.userId)
+    .first<{ email: string; handle: string; displayName: string | null }>();
+  if (!user) throw new HTTPException(404, { message: 'user not found' });
+  if (body.confirm !== user.handle) {
+    throw new HTTPException(400, {
+      message: `confirm must equal your handle "${user.handle}"`,
+    });
+  }
+
+  await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(session.userId).run();
+
+  // Best-effort goodbye email. After this point the row is gone so we
+  // can't recover the address — captured above.
+  try {
+    const tpl = accountDeletedEmail({
+      appOrigin: c.env.APP_ORIGIN,
+      athlete: { handle: user.handle, displayName: user.displayName },
+    });
+    await sendEmail(c.env, {
+      to: user.email,
+      subject: tpl.subject,
+      html: tpl.html,
+      text: tpl.text,
+      idempotencyKey: `goodbye:${session.userId}`,
+    });
+  } catch (err) {
+    console.warn('goodbye email failed', err);
+  }
+
+  // Clear the session cookie so the browser doesn't keep replaying it.
+  c.header(
+    'Set-Cookie',
+    'pacelore_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0',
+  );
   return c.json({ ok: true });
 });

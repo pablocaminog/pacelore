@@ -14,6 +14,8 @@ import { Hono, type Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { Env } from '../env.js';
 import { requireSession, type AuthVariables } from '../middleware/auth.js';
+import { sendEmail } from '../integrations/email.js';
+import { newFollowerEmail } from '../integrations/email-templates.js';
 
 type Ctx = Context<{ Bindings: Env; Variables: AuthVariables }>;
 
@@ -29,13 +31,45 @@ followRoutes.post('/follows/:athleteId', async (c) => {
   const exists = await c.env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(target).first();
   if (!exists) throw new HTTPException(404, { message: 'athlete not found' });
 
-  await c.env.DB.prepare(
+  const result = await c.env.DB.prepare(
     'INSERT INTO follows (follower_id, followee_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
   )
     .bind(session.userId, target)
     .run();
+
+  if (result.meta?.changes && result.meta.changes > 0) {
+    await notifyNewFollower(c.env, target, session.userId).catch(() => {});
+  }
   return c.json({ ok: true, followerId: session.userId, followeeId: target });
 });
+
+async function notifyNewFollower(env: Env, ownerId: string, actorId: string): Promise<void> {
+  const owner = await env.DB.prepare(
+    `SELECT email, handle, display_name AS displayName FROM users WHERE id = ?`,
+  )
+    .bind(ownerId)
+    .first<{ email: string; handle: string; displayName: string | null }>();
+  if (!owner) return;
+  const actor = await env.DB.prepare(
+    `SELECT handle, display_name AS displayName FROM users WHERE id = ?`,
+  )
+    .bind(actorId)
+    .first<{ handle: string; displayName: string | null }>();
+  if (!actor) return;
+  const tpl = newFollowerEmail({
+    appOrigin: env.APP_ORIGIN,
+    athlete: { handle: owner.handle, displayName: owner.displayName },
+    followerHandle: actor.handle,
+    followerName: actor.displayName ?? actor.handle,
+  });
+  await sendEmail(env, {
+    to: owner.email,
+    subject: tpl.subject,
+    html: tpl.html,
+    text: tpl.text,
+    idempotencyKey: `follow:${ownerId}:${actorId}`,
+  });
+}
 
 followRoutes.delete('/follows/:athleteId', async (c) => {
   const target = c.req.param('athleteId');

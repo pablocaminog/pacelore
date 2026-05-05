@@ -16,6 +16,8 @@ import { HTTPException } from 'hono/http-exception';
 import type { Env, IngestJob } from '../env.js';
 import { requireSession, type AuthVariables } from '../middleware/auth.js';
 import { uuidv7 } from '../util/uuid.js';
+import { sendEmail } from '../integrations/email.js';
+import { kudosEmail, commentEmail } from '../integrations/email-templates.js';
 
 export const activityRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
@@ -132,11 +134,21 @@ activityRoutes.post('/activities/:id/kudos', async (c) => {
   if (!(await canView(c.env, row, session.userId))) {
     throw new HTTPException(403, { message: 'not allowed' });
   }
-  await c.env.DB.prepare(
+  const result = await c.env.DB.prepare(
     'INSERT INTO kudos (activity_id, athlete_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
   )
     .bind(id, session.userId)
     .run();
+
+  // Notify the activity owner once per (activity, kudoer) pair —
+  // ON CONFLICT swallows repeats, so meta.changes flips to 0 there.
+  if (
+    result.meta?.changes &&
+    result.meta.changes > 0 &&
+    row.athleteId !== session.userId
+  ) {
+    await notifyKudos(c.env, row.athleteId, session.userId, id).catch(() => {});
+  }
   return c.json({ ok: true });
 });
 
@@ -187,6 +199,10 @@ activityRoutes.post('/activities/:id/comments', async (c) => {
   )
     .bind(commentId, id, session.userId, text, body.parentId ?? null)
     .run();
+
+  if (row.athleteId !== session.userId) {
+    await notifyComment(c.env, row.athleteId, session.userId, id, text).catch(() => {});
+  }
   return c.json({ id: commentId, body: text });
 });
 
@@ -339,4 +355,94 @@ async function readBody(req: Request): Promise<ArrayBuffer> {
     throw new HTTPException(413, { message: `body exceeds ${MAX_BYTES} bytes` });
   }
   return (await req.arrayBuffer()) as ArrayBuffer;
+}
+
+interface NotifyContext {
+  ownerEmail: string;
+  ownerHandle: string;
+  ownerDisplayName: string | null;
+  actorHandle: string;
+  actorDisplayName: string | null;
+  activityName: string | null;
+}
+
+async function loadNotifyContext(
+  env: Env,
+  ownerId: string,
+  actorId: string,
+  activityId: string,
+): Promise<NotifyContext | null> {
+  const owner = await env.DB.prepare(
+    `SELECT email, handle, display_name AS displayName FROM users WHERE id = ?`,
+  )
+    .bind(ownerId)
+    .first<{ email: string; handle: string; displayName: string | null }>();
+  if (!owner) return null;
+  const actor = await env.DB.prepare(
+    `SELECT handle, display_name AS displayName FROM users WHERE id = ?`,
+  )
+    .bind(actorId)
+    .first<{ handle: string; displayName: string | null }>();
+  if (!actor) return null;
+  const activity = await env.DB.prepare(`SELECT name FROM activities WHERE id = ?`)
+    .bind(activityId)
+    .first<{ name: string | null }>();
+  return {
+    ownerEmail: owner.email,
+    ownerHandle: owner.handle,
+    ownerDisplayName: owner.displayName,
+    actorHandle: actor.handle,
+    actorDisplayName: actor.displayName,
+    activityName: activity?.name ?? null,
+  };
+}
+
+async function notifyKudos(
+  env: Env,
+  ownerId: string,
+  actorId: string,
+  activityId: string,
+): Promise<void> {
+  const ctx = await loadNotifyContext(env, ownerId, actorId, activityId);
+  if (!ctx) return;
+  const tpl = kudosEmail({
+    appOrigin: env.APP_ORIGIN,
+    athlete: { handle: ctx.ownerHandle, displayName: ctx.ownerDisplayName },
+    kudosFromHandle: ctx.actorHandle,
+    kudosFromName: ctx.actorDisplayName ?? ctx.actorHandle,
+    activityId,
+    activityName: ctx.activityName ?? 'an activity',
+  });
+  await sendEmail(env, {
+    to: ctx.ownerEmail,
+    subject: tpl.subject,
+    html: tpl.html,
+    text: tpl.text,
+    idempotencyKey: `kudos:${activityId}:${actorId}`,
+  });
+}
+
+async function notifyComment(
+  env: Env,
+  ownerId: string,
+  actorId: string,
+  activityId: string,
+  text: string,
+): Promise<void> {
+  const ctx = await loadNotifyContext(env, ownerId, actorId, activityId);
+  if (!ctx) return;
+  const tpl = commentEmail({
+    appOrigin: env.APP_ORIGIN,
+    athlete: { handle: ctx.ownerHandle, displayName: ctx.ownerDisplayName },
+    commenterName: ctx.actorDisplayName ?? ctx.actorHandle,
+    activityId,
+    activityName: ctx.activityName ?? 'an activity',
+    body: text,
+  });
+  await sendEmail(env, {
+    to: ctx.ownerEmail,
+    subject: tpl.subject,
+    html: tpl.html,
+    text: tpl.text,
+  });
 }
