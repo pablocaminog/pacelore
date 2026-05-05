@@ -2,8 +2,8 @@
   "name": "pacelore",
   "version": "0.0.0",
   "private": true,
-  "description": "Open-source training platform — Strava + TrainingPeaks alternative on Cloudflare.",
-  "license": "AGPL-3.0-only",
+  "description": "Source-available, noncommercial training platform — Strava + TrainingPeaks alternative on Cloudflare.",
+  "license": "SEE LICENSE IN LICENSE",
   "author": "Pablo Caminog <pcaminog@gmail.com>",
   "homepage": "https://github.com/pablocaminog/pacelore",
   "repository": {

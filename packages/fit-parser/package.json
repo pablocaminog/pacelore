@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "FIT / TCX / GPX activity file parser.",
-  "license": "AGPL-3.0-only",
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",

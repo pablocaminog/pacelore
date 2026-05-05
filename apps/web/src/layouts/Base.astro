@@ -3,7 +3,8 @@ interface Props {
   title?: string;
   description?: string;
 }
-const { title = 'pacelore', description = 'open-source training platform' } = Astro.props;
+const { title = 'pacelore', description = 'source-available, noncommercial training platform' } =
+  Astro.props;
 ---
 
 <!doctype html>
@@ -34,7 +35,7 @@ const { title = 'pacelore', description = 'open-source training platform' } = As
       <slot />
     </main>
     <footer class="mt-16 border-t border-neutral-200 px-4 py-6 text-center text-xs text-neutral-500 dark:border-neutral-800">
-      AGPL-3.0 ·
+      PolyForm Noncommercial 1.0.0 ·
       <a href="https://github.com/pablocaminog/pacelore" class="hover:text-accent">source</a>
     </footer>
   </body>

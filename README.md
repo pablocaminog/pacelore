@@ -1,6 +1,6 @@
 # Pacelore
 
-Open-source training platform. Imports activities from Garmin, Strava, Zwift (via Strava bridge), Apple Health, and direct FIT/TCX/GPX upload. Computes the analytics that Strava paywalls and TrainingPeaks charges \$20/mo for — TSS, IF, NP, peak power curve, GAP, decoupling, CTL/ATL/TSB. Adds a social feed, kudos, comments, segments with leaderboards, clubs, and events on top.
+Source-available, noncommercial training platform. Imports activities from Garmin, Strava, Zwift (via Strava bridge), Apple Health, and direct FIT/TCX/GPX upload. Computes the analytics that Strava paywalls and TrainingPeaks charges \$20/mo for — TSS, IF, NP, peak power curve, GAP, decoupling, CTL/ATL/TSB. Adds a social feed, kudos, comments, segments with leaderboards, clubs, challenges, and events on top.
 
 Runs entirely on Cloudflare's edge. Autoscales to zero. Costs effectively nothing for a hobby instance.
 
@@ -12,7 +12,7 @@ Runs entirely on Cloudflare's edge. Autoscales to zero. Costs effectively nothin
 
 Strava locked away the analytics most cyclists and runners actually use. TrainingPeaks costs ~\$240/yr. Garmin Connect is fine until you want to share with friends. Nobody owns their data — every platform is one acquisition or pricing change away from breaking workflows people built over a decade.
 
-Pacelore is an attempt to put all that under one roof, on infrastructure cheap enough that the project can stay free, and under a license (AGPL-3.0) that keeps it that way. Modest goals: be useful, be honest about limitations, don't paywall the things that matter.
+Pacelore is an attempt to put all that under one roof, on infrastructure cheap enough that the project can stay free, and under a license ([PolyForm Noncommercial 1.0.0](./LICENSE)) that keeps it that way: source is open for anyone to read, run, learn from, and self-host for personal or nonprofit use — but nobody gets to wrap it in a paywall and resell it. Modest goals: be useful, be honest about limitations, don't paywall the things that matter.
 
 ## What it does today
 
@@ -121,7 +121,11 @@ PRs welcome. The codebase is intentionally small — read `ARCHITECTURE.md`, pic
 
 ## License
 
-[AGPL-3.0](./LICENSE). If you run a modified version as a service, you must publish your changes.
+[PolyForm Noncommercial 1.0.0](./LICENSE).
+
+In plain language: you can read, fork, run, modify, and self-host Pacelore for any noncommercial purpose — personal training, hobby projects, research, education, government, charity. You can not run it as a commercial product, charge for access, or build a business on top of it. If you want a commercial license, open an issue.
+
+This is a "source-available" license, not OSI-certified open source — open source by OSI's definition forbids field-of-use restrictions, and "no commercial use" is one. The source is fully open; the commercial path isn't.
 
 ## Trademark notice
 

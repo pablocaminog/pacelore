@@ -9,7 +9,7 @@ Constraints driven by research-agent run:
 - **No silent paywalls** (#2 finding) — pricing transparent, no renewal hikes, free tier covers all core analytics.
 - **Open API** — third parties welcome, attribution-only.
 - Runs **entirely on Cloudflare** — minimum ops, low fixed cost, global edge.
-- Open-source **AGPL-3.0** (or PolyForm Shield).
+- Source-available under **PolyForm Noncommercial 1.0.0** — read, run, fork for personal/nonprofit use; no commercial productization.
 
 ---
 
@@ -325,9 +325,9 @@ Quarterly anonymized dump (no GPS coords near home addresses, no names, hashed u
 
 ---
 
-## 10. Open-source posture
+## 10. Source-available posture
 
-- **License**: AGPL-3.0 (forces SaaS forks to publish their changes) OR PolyForm Shield (allows commercial forks but blocks competitive SaaS).
+- **License**: [PolyForm Noncommercial 1.0.0](./LICENSE) — source open, all noncommercial use permitted (personal, research, nonprofit, government); commercial use prohibited. Not OSI-OSS by definition; the source is just as open, the commercial path isn't.
 - Repo: monorepo with `apps/web`, `apps/api`, `apps/ios`, `packages/fit-parser`, `packages/metrics`, `packages/segments`, `infra/wrangler`.
 - Wrangler-based deploy. Anyone can fork + deploy their own instance to their Cloudflare account in <10 min.
 - Public roadmap. RFC process for major features (CONTRIBUTING.md).
@@ -386,7 +386,7 @@ Total to MVP-with-social: ~5 months solo dev. Faster with a small team.
 
 - **Top complaint: Aggressive monetization** → free tier covers all core analytics. Paid tier is convenience (priority email, advanced ML insights, Arweave permanence).
 - **Top complaint: API restrictions** → public, free, attribution-only API from day 1.
-- **Top complaint: Corporate aggression / lawsuits** → AGPL + foundation governance, not single-corp.
+- **Top complaint: Corporate aggression / lawsuits** → noncommercial license blocks competitive forks while keeping source open for everyone else.
 - **Top complaint: Infrastructure failures** → Cloudflare global edge, autoscaling, no single region.
 - **Top opportunity: data sovereignty** → free export, Arweave optional, ATProto/Nostr export.
 - **Switching destination Garmin Connect (#1)** → first-class Garmin import, day 1.
