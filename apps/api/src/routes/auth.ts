@@ -47,9 +47,28 @@ authRoutes.post('/auth/register/options', async (c) => {
   if (await findUserByEmail(c.env, email)) {
     throw new HTTPException(409, { message: 'email already registered' });
   }
+  // Handle is also unique (NOCASE). Pre-check so we can give a clear
+  // 409 instead of letting D1 raise the constraint as a 500.
+  const handleTaken = await c.env.DB.prepare(
+    'SELECT id FROM users WHERE handle = ? COLLATE NOCASE',
+  )
+    .bind(handle)
+    .first();
+  if (handleTaken) {
+    throw new HTTPException(409, { message: 'handle already taken' });
+  }
 
   const userId = uuidv7();
-  await createUser(c.env, { id: userId, handle, email });
+  try {
+    await createUser(c.env, { id: userId, handle, email });
+  } catch (err) {
+    // Belt-and-braces — race between the pre-check and INSERT.
+    const msg = (err as Error).message ?? '';
+    if (msg.includes('UNIQUE')) {
+      throw new HTTPException(409, { message: 'handle or email already taken' });
+    }
+    throw err;
+  }
 
   const rp = rpFromOrigin(c.env.APP_ORIGIN);
   const { challengeId, options } = await startRegistration(c.env, rp, { id: userId, handle });
