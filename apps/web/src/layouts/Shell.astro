@@ -1,6 +1,7 @@
 ---
 import Base from './Base.astro';
 import Icon from '../components/Icon.astro';
+import Wordmark from '../components/Wordmark.astro';
 
 interface Props {
   title?: string;
@@ -40,11 +41,7 @@ const navCommunity: { id: string; label: string; href: string; icon: string }[] 
   <div class="app">
     <aside class="rail">
       <a href="/" class="brand" aria-label="pacelore home">
-        <img
-          src="/logo-wordmark.svg"
-          alt="pacelore"
-          style="height: 26px; color: var(--fg);"
-        />
+        <Wordmark height={26} />
       </a>
       <span class="nav-section">Training</span>
       {

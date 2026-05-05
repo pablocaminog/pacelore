@@ -1,13 +1,14 @@
 ---
 import Base from '../layouts/Base.astro';
 import Icon from '../components/Icon.astro';
+import Wordmark from '../components/Wordmark.astro';
 ---
 
 <Base title="Create account">
   <div class="auth-shell">
     <div class="auth-card">
       <a href="/" aria-label="pacelore home">
-        <img src="/logo-wordmark.svg" alt="pacelore" style="height: 28px; color: var(--fg);" />
+        <Wordmark height={28} />
       </a>
       <div>
         <h2 class="h2" style="font-size: 22px;">Create your account</h2>

@@ -1,5 +1,6 @@
 ---
 import Base from './Base.astro';
+import Wordmark from '../components/Wordmark.astro';
 
 interface Props {
   title?: string;
@@ -13,7 +14,7 @@ const { title, description } = Astro.props;
     <header class="marketing-nav">
       <div class="marketing-nav-inner">
         <a href="/" class="brand" aria-label="pacelore home">
-          <img src="/logo-wordmark.svg" alt="pacelore" style="height: 26px; color: var(--fg);" />
+          <Wordmark height={26} />
         </a>
         <span class="marketing-nav-spacer"></span>
         <nav>

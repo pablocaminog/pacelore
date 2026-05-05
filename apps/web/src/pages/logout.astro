@@ -1,12 +1,13 @@
 ---
 import Base from '../layouts/Base.astro';
+import Wordmark from '../components/Wordmark.astro';
 ---
 
 <Base title="Sign out">
   <div class="auth-shell">
     <div class="auth-card" style="text-align: center;">
       <a href="/" aria-label="pacelore home" style="align-self: center;">
-        <img src="/logo-wordmark.svg" alt="pacelore" style="height: 26px; color: var(--fg);" />
+        <Wordmark height={26} />
       </a>
       <h2 class="h2" style="font-size: 22px;">Signing you out…</h2>
       <p id="logout-status" class="muted body-sm"></p>
