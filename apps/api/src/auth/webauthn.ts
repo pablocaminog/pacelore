@@ -45,10 +45,19 @@ export function rpFromOrigin(origin: string): RpConfig {
 
 const CHALLENGE_TTL_SECONDS = 5 * 60;
 
-interface ChallengeRecord {
+export interface ChallengeRecord {
   challenge: string;
   /** For login flows, the user this challenge is associated with. */
   userId?: string;
+  /** For register flows, the user-supplied identity to commit on
+   *  successful verification. Lets us defer the DB write so an
+   *  abandoned passkey ceremony doesn't leave an orphan row. */
+  pendingUser?: {
+    id: string;
+    handle: string;
+    email: string;
+    displayName?: string;
+  };
 }
 
 async function storeChallenge(env: Env, record: ChallengeRecord): Promise<string> {
@@ -74,7 +83,7 @@ export interface RegOptions {
 export async function startRegistration(
   env: Env,
   rp: RpConfig,
-  user: { id: string; handle: string; displayName?: string },
+  user: { id: string; handle: string; email: string; displayName?: string },
   excludeCredentialIds: string[] = [],
 ): Promise<RegOptions> {
   const options = await generateRegistrationOptions({
@@ -90,7 +99,17 @@ export async function startRegistration(
       userVerification: 'required',
     },
   });
-  const challengeId = await storeChallenge(env, { challenge: options.challenge, userId: user.id });
+  const pendingUser = {
+    id: user.id,
+    handle: user.handle,
+    email: user.email,
+    ...(user.displayName ? { displayName: user.displayName } : {}),
+  };
+  const challengeId = await storeChallenge(env, {
+    challenge: options.challenge,
+    userId: user.id,
+    pendingUser,
+  });
   return { challengeId, options };
 }
 
@@ -99,6 +118,7 @@ export interface VerifiedRegistration {
   publicKey: Uint8Array;
   counter: number;
   transports?: AuthenticatorTransportFuture[];
+  pendingUser?: ChallengeRecord['pendingUser'];
 }
 
 export async function finishRegistration(
@@ -126,6 +146,7 @@ export async function finishRegistration(
     counter: info.credential.counter,
   };
   if (info.credential.transports) out.transports = info.credential.transports;
+  if (ch.pendingUser) out.pendingUser = ch.pendingUser;
   return out;
 }
 

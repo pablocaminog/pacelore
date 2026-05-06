@@ -49,12 +49,13 @@ authRoutes.post('/auth/register/options', async (c) => {
   if (!isValidHandle(handle)) throw new HTTPException(400, { message: 'invalid handle' });
   if (!isValidEmail(email)) throw new HTTPException(400, { message: 'invalid email' });
 
-  // Email may already exist — that's a login flow, not register.
+  // Pre-flight uniqueness check. Acceptable enumeration tradeoff —
+  // passkey-only registration always leaks existence. The user row
+  // itself is *not* created here; we defer the INSERT to verify so an
+  // abandoned ceremony doesn't reserve the email/handle.
   if (await findUserByEmail(c.env, email)) {
     throw new HTTPException(409, { message: 'email already registered' });
   }
-  // Handle is also unique (NOCASE). Pre-check so we can give a clear
-  // 409 instead of letting D1 raise the constraint as a 500.
   const handleTaken = await c.env.DB.prepare(
     'SELECT id FROM users WHERE handle = ? COLLATE NOCASE',
   )
@@ -65,19 +66,12 @@ authRoutes.post('/auth/register/options', async (c) => {
   }
 
   const userId = uuidv7();
-  try {
-    await createUser(c.env, { id: userId, handle, email });
-  } catch (err) {
-    // Belt-and-braces — race between the pre-check and INSERT.
-    const msg = (err as Error).message ?? '';
-    if (msg.includes('UNIQUE')) {
-      throw new HTTPException(409, { message: 'handle or email already taken' });
-    }
-    throw err;
-  }
-
   const rp = rpFromOrigin(c.env.APP_ORIGIN);
-  const { challengeId, options } = await startRegistration(c.env, rp, { id: userId, handle });
+  const { challengeId, options } = await startRegistration(c.env, rp, {
+    id: userId,
+    handle,
+    email,
+  });
   return c.json({ challengeId, userId, options });
 });
 
@@ -87,19 +81,35 @@ authRoutes.post('/auth/register/verify', async (c) => {
 
   const body = await readJson<{
     challengeId?: string;
-    userId?: string;
     response?: unknown;
     deviceName?: string;
   }>(c.req.raw);
-  if (!body.challengeId || !body.userId || !body.response) {
+  if (!body.challengeId || !body.response) {
     throw new HTTPException(400, { message: 'missing required fields' });
   }
   const rp = rpFromOrigin(c.env.APP_ORIGIN);
   const verified = await finishRegistration(c.env, rp, body.challengeId, body.response as never);
+  if (!verified.pendingUser) {
+    throw new HTTPException(400, { message: 'challenge missing pending user' });
+  }
+  const pending = verified.pendingUser;
+
+  // Commit the user row + credential atomically. ON CONFLICT swallows
+  // a tight race with another register on the same email/handle and
+  // surfaces as 409.
+  try {
+    await createUser(c.env, { id: pending.id, handle: pending.handle, email: pending.email });
+  } catch (err) {
+    const msg = (err as Error).message ?? '';
+    if (msg.includes('UNIQUE')) {
+      throw new HTTPException(409, { message: 'handle or email already taken' });
+    }
+    throw err;
+  }
 
   await insertCredential(c.env, {
     id: verified.credentialId,
-    userId: body.userId,
+    userId: pending.id,
     publicKey: verified.publicKey,
     counter: verified.counter,
     ...(verified.transports ? { transports: verified.transports as string[] } : {}),
@@ -107,46 +117,39 @@ authRoutes.post('/auth/register/verify', async (c) => {
   });
   await logAuthEvent(c.env, {
     kind: 'credential_added',
-    athleteId: body.userId,
+    athleteId: pending.id,
     detail: 'register',
     ip,
     userAgent: c.req.header('user-agent') ?? null,
   });
   await logAuthEvent(c.env, {
     kind: 'register',
-    athleteId: body.userId,
+    athleteId: pending.id,
     ip,
     userAgent: c.req.header('user-agent') ?? null,
   });
 
-  const { cookie } = await createSession(c.env, body.userId);
+  const { cookie } = await createSession(c.env, pending.id);
   c.header('Set-Cookie', cookie);
 
   // Fire welcome email (best-effort).
   try {
-    const user = await c.env.DB.prepare(
-      `SELECT email, handle, display_name AS displayName FROM users WHERE id = ?`,
-    )
-      .bind(body.userId)
-      .first<{ email: string; handle: string; displayName: string | null }>();
-    if (user) {
-      const tpl = welcomeEmail({
-        appOrigin: c.env.APP_ORIGIN,
-        athlete: { handle: user.handle, displayName: user.displayName },
-      });
-      await sendEmail(c.env, {
-        to: user.email,
-        subject: tpl.subject,
-        html: tpl.html,
-        text: tpl.text,
-        idempotencyKey: `welcome:${body.userId}`,
-      });
-    }
+    const tpl = welcomeEmail({
+      appOrigin: c.env.APP_ORIGIN,
+      athlete: { handle: pending.handle },
+    });
+    await sendEmail(c.env, {
+      to: pending.email,
+      subject: tpl.subject,
+      html: tpl.html,
+      text: tpl.text,
+      idempotencyKey: `welcome:${pending.id}`,
+    });
   } catch (err) {
     console.warn('welcome email failed', err);
   }
 
-  return c.json({ ok: true, userId: body.userId });
+  return c.json({ ok: true, userId: pending.id });
 });
 
 authRoutes.post('/auth/login/options', async (c) => {

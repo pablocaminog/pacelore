@@ -82,7 +82,7 @@ import Wordmark from '../components/Wordmark.astro';
         throw new Error(
           (await optionsRes.json().catch(() => ({ error: optionsRes.statusText }))).error,
         );
-      const { challengeId, userId, options } = await optionsRes.json();
+      const { challengeId, options } = await optionsRes.json();
 
       const attestation = await startRegistration({ optionsJSON: options });
 
@@ -92,7 +92,6 @@ import Wordmark from '../components/Wordmark.astro';
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           challengeId,
-          userId,
           response: attestation,
           deviceName: navigator.userAgent.slice(0, 60),
         }),
@@ -103,7 +102,8 @@ import Wordmark from '../components/Wordmark.astro';
         );
 
       status.textContent = 'Account created — redirecting…';
-      window.location.href = '/dashboard';
+      const next = new URL(window.location.href).searchParams.get('next');
+      window.location.href = next && next.startsWith('/') ? next : '/dashboard';
     } catch (err) {
       status.textContent = `Couldn't create account: ${(err as Error).message}`;
       submit.disabled = false;

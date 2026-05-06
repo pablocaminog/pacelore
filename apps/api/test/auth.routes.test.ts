@@ -38,13 +38,18 @@ describe('auth routes', () => {
   });
 
   it('rejects duplicate email', async () => {
+    // /register/options no longer creates the user row — that's deferred
+    // to /register/verify so an abandoned passkey ceremony doesn't
+    // reserve the email/handle. Pre-seed the row to simulate an
+    // already-verified account and expect 409.
     const app = buildApp();
     const env = fakeEnv();
-    const ok = await postJson(app, env, '/api/v1/auth/register/options', {
+    env.DB.users.push({
+      id: 'pre-existing',
       handle: 'alice',
       email: 'a@b.co',
+      displayName: null,
     });
-    expect(ok.status).toBe(200);
     const dup = await postJson(app, env, '/api/v1/auth/register/options', {
       handle: 'alice2',
       email: 'a@b.co',
