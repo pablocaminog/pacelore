@@ -29,6 +29,7 @@ import { loadSession } from '../auth/session.js';
 import { uuidv7 } from '../util/uuid.js';
 import { sendEmail } from '../integrations/email.js';
 import { importDoneEmail } from '../integrations/email-templates.js';
+import { fetchStravaActivityAsTcx } from '../integrations/strava-tcx.js';
 
 export const stravaRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
@@ -41,8 +42,9 @@ const RATE_WINDOW_SEC = 15 * 60;
 const RATE_WINDOW_MAX = 95; // leave headroom under Strava's 100/15min cap
 const DAILY_WINDOW_SEC = 24 * 60 * 60;
 const DAILY_WINDOW_MAX = 950; // headroom under 1000/day
-// Per tick: one list call + this many activity fetches.
-const TICK_BATCH = 25;
+// Per tick: one list call + this many activity fetches × 2 calls each.
+// 12 fetches → 25 requests / tick — leaves headroom under 95/15min cap.
+const TICK_BATCH = 12;
 
 // --------------------------- OAuth ---------------------------
 
@@ -305,18 +307,17 @@ export async function stravaTickOnce(env: Env, jobId: string): Promise<void> {
       continue;
     }
 
-    if (rateUsed >= RATE_WINDOW_MAX || dailyUsed >= DAILY_WINDOW_MAX) break;
+    // Each activity: 1 summary call + 1 streams call = 2 against budget.
+    if (rateUsed + 2 > RATE_WINDOW_MAX || dailyUsed + 2 > DAILY_WINDOW_MAX) break;
 
-    const tcxRes = await fetch(`${STRAVA_API}/activities/${it.id}/export_tcx`, {
-      headers: { Authorization: `Bearer ${tok.access_token}`, Accept: 'application/xml' },
-    });
-    rateUsed++;
-    dailyUsed++;
-    if (!tcxRes.ok) {
+    const fetched = await fetchStravaActivityAsTcx(tok.access_token, it.id);
+    rateUsed += 2;
+    dailyUsed += 2;
+    if (!fetched) {
       failed++;
       continue;
     }
-    const text = await tcxRes.text();
+    const text = fetched.tcx;
     const activityId = uuidv7();
     const date = new Date(it.start_date);
     const yyyy = date.getUTCFullYear();
