@@ -8,6 +8,7 @@ import { Hono } from 'hono';
 import { errorMiddleware } from './middleware/error.js';
 import { corsMiddleware } from './middleware/cors.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
+import { demoGuard } from './middleware/demoGuard.js';
 import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './routes/auth.js';
 import { activityRoutes } from './routes/activities.js';
@@ -35,6 +36,8 @@ export function buildApp(): Hono<{ Bindings: Env }> {
   app.use('*', requestIdMiddleware());
   app.use('*', errorMiddleware());
   app.use('*', corsMiddleware());
+  // demoGuard short-circuits writes when DEMO_MODE=true; no-op otherwise.
+  app.use('*', demoGuard());
 
   app.get('/', (c) =>
     c.json({

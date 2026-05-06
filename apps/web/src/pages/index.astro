@@ -477,8 +477,8 @@ const jsonLd = [
                 {f.q}
               </summary>
               <div
-                class="panel-body"
-                style="padding-top: 0; border-top: 1px solid var(--border); color: var(--fg);"
+                class="panel-body faq-body"
+                style="border-top: 1px solid var(--border); color: var(--fg);"
               >
                 {f.a}
               </div>
@@ -524,5 +524,34 @@ const jsonLd = [
   }
   details.panel[open] summary {
     border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+  }
+  details.panel .faq-body {
+    padding: 20px;
+    line-height: 1.6;
+  }
+  details.panel[open] .faq-body {
+    animation: faq-fade 160ms ease-out;
+  }
+  @keyframes faq-fade {
+    from { opacity: 0; transform: translateY(-2px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
 </style>
+
+<script>
+  // Client-side logged-in redirect.
+  // Crawlers and unauthenticated visitors see the marketing HTML cached at the
+  // edge; signed-in users get bounced to /feed within ~50ms of TTI.
+  (function () {
+    if (typeof document === 'undefined') return;
+    if (!document.cookie) return; // no cookies → not logged in, no need to fetch
+    fetch('/api/v1/auth/me', { credentials: 'same-origin', redirect: 'manual' })
+      .then((r) => {
+        if (r.ok) location.replace('/feed');
+      })
+      .catch(() => {
+        /* offline or auth probe failed — leave the marketing page rendered */
+      });
+  })();
+</script>

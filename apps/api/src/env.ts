@@ -7,6 +7,8 @@ export interface Env {
   // Vars
   ENV: 'dev' | 'staging' | 'production';
   APP_ORIGIN: string;
+  /** When `'true'`, demoGuard middleware blocks all non-GET writes. */
+  DEMO_MODE?: 'true' | 'false';
 
   // Secrets
   SESSION_SIGNING_KEY: string;

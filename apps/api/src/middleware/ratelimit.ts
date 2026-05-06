@@ -45,11 +45,10 @@ export async function rateLimit(
     return { ok: false, remaining: 0, retryAfter: resetAt - now };
   }
   count++;
-  await env.KV_SESSIONS.put(
-    fullKey,
-    JSON.stringify({ count, resetAt }),
-    { expirationTtl: Math.max(1, resetAt - now) },
-  );
+  // Cloudflare KV requires expirationTtl >= 60s. Floor the residual
+  // window TTL at 60 so a near-expiry write doesn't 400.
+  const ttl = Math.max(60, resetAt - now);
+  await env.KV_SESSIONS.put(fullKey, JSON.stringify({ count, resetAt }), { expirationTtl: ttl });
   return { ok: true, remaining: max - count, retryAfter: resetAt - now };
 }
 
