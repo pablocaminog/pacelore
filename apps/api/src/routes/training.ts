@@ -178,6 +178,44 @@ interface ScheduleBody {
   athleteId?: string;
 }
 
+/**
+ * Calendar activities — for the TrainingPeaks-style grid view.
+ * Returns every activity that started inside [from, to], plus the
+ * source columns the UI uses to label per-card.
+ *
+ *   GET /api/v1/me/calendar/activities?from=YYYY-MM-DD&to=YYYY-MM-DD
+ */
+trainingRoutes.get('/me/calendar/activities', async (c) => {
+  const session = c.get('session');
+  const url = new URL(c.req.url);
+  const from = url.searchParams.get('from');
+  const to = url.searchParams.get('to');
+  if (!from || !to) {
+    throw new HTTPException(400, { message: 'from and to required (YYYY-MM-DD)' });
+  }
+  const fromEpoch = Math.floor(Date.parse(`${from}T00:00:00Z`) / 1000);
+  const toEpoch = Math.floor(Date.parse(`${to}T23:59:59Z`) / 1000);
+  if (!Number.isFinite(fromEpoch) || !Number.isFinite(toEpoch)) {
+    throw new HTTPException(400, { message: 'invalid from/to' });
+  }
+  const rows = await c.env.DB.prepare(
+    `SELECT id, sport, name, started_at AS startedAt, total_seconds AS totalSeconds,
+            distance_m AS distanceM, ascent_m AS ascentM,
+            hr_avg AS hrAvg, hr_max AS hrMax,
+            power_avg AS powerAvg, power_max AS powerMax,
+            np, intensity_factor AS intensityFactor, tss, kj,
+            speed_avg_ms AS speedAvgMs,
+            source, external_source AS externalSource, external_id AS externalId
+       FROM activities
+      WHERE athlete_id = ?
+        AND started_at BETWEEN ? AND ?
+      ORDER BY started_at ASC`,
+  )
+    .bind(session.userId, fromEpoch, toEpoch)
+    .all();
+  return c.json({ items: rows.results ?? [] });
+});
+
 trainingRoutes.post('/me/calendar', async (c) => {
   const body = (await c.req.json()) as ScheduleBody;
   const session = c.get('session');
