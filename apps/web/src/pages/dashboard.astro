@@ -52,10 +52,41 @@ import Shell from '../layouts/Shell.astro';
     <div class="panel">
       <div class="panel-header">
         <h3 class="h3" style="font-size: 16px;">Calendar · last 12 weeks</h3>
-        <span class="row-end caption">5-step zone ramp · cool slate → clay</span>
+        <span class="row-end caption">daily TSS, 5-step zone ramp</span>
       </div>
-      <div class="panel-body">
+      <div class="panel-body stack" style="gap: 14px;">
         <div id="heatmap" style="display: flex;"></div>
+        <div
+          id="heatmap-legend"
+          style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-family: var(--font-mono); font-size: 11px; color: var(--fg-muted);"
+        >
+          <span class="metric-label" style="margin-right: 4px;">Daily TSS</span>
+          <span style="display: inline-flex; align-items: center; gap: 6px;">
+            <span style="width: 14px; height: 14px; border-radius: 4px; background: var(--zone-0); border: 1px solid var(--border);"></span>
+            rest
+          </span>
+          <span style="display: inline-flex; align-items: center; gap: 6px;">
+            <span style="width: 14px; height: 14px; border-radius: 4px; background: var(--zone-1);"></span>
+            ≤ 20%
+          </span>
+          <span style="display: inline-flex; align-items: center; gap: 6px;">
+            <span style="width: 14px; height: 14px; border-radius: 4px; background: var(--zone-2);"></span>
+            ≤ 40%
+          </span>
+          <span style="display: inline-flex; align-items: center; gap: 6px;">
+            <span style="width: 14px; height: 14px; border-radius: 4px; background: var(--zone-3);"></span>
+            ≤ 60%
+          </span>
+          <span style="display: inline-flex; align-items: center; gap: 6px;">
+            <span style="width: 14px; height: 14px; border-radius: 4px; background: var(--zone-4);"></span>
+            ≤ 85%
+          </span>
+          <span style="display: inline-flex; align-items: center; gap: 6px;">
+            <span style="width: 14px; height: 14px; border-radius: 4px; background: var(--zone-5);"></span>
+            peak
+          </span>
+          <span class="row-end caption" id="heatmap-max" style="font-family: var(--font-mono);"></span>
+        </div>
       </div>
     </div>
   </div>
@@ -205,21 +236,35 @@ import Shell from '../layouts/Shell.astro';
     new uPlot(opts, [t, tss], el);
   }
 
+  // uPlot draws to canvas — CSS vars don't resolve there. Match the
+  // ink palette manually and pick by current scheme.
+  function axisColors() {
+    const dark =
+      document.documentElement.dataset.theme === 'dark' ||
+      document.documentElement.classList.contains('dark') ||
+      (document.documentElement.dataset.theme !== 'light' &&
+        window.matchMedia('(prefers-color-scheme: dark)').matches);
+    return dark
+      ? { stroke: '#a8a8a3', grid: '#3a3a36', ticks: '#525250' }
+      : { stroke: '#525250', grid: '#e0e0d8', ticks: '#a8a8a3' };
+  }
   function axisX() {
+    const c = axisColors();
     return {
-      stroke: 'var(--fg-muted)',
-      grid: { stroke: 'var(--border)', width: 1 },
-      ticks: { stroke: 'var(--border)', width: 1, size: 6 },
+      stroke: c.stroke,
+      grid: { stroke: c.grid, width: 1 },
+      ticks: { stroke: c.ticks, width: 1, size: 6 },
       font: '13px "Geist Mono", ui-monospace, Menlo, monospace',
       size: 56,
       space: 90,
     } as uPlot.Axis;
   }
   function axisY() {
+    const c = axisColors();
     return {
-      stroke: 'var(--fg-muted)',
-      grid: { stroke: 'var(--border)', width: 1 },
-      ticks: { stroke: 'var(--border)', width: 1, size: 6 },
+      stroke: c.stroke,
+      grid: { stroke: c.grid, width: 1 },
+      ticks: { stroke: c.ticks, width: 1, size: 6 },
       font: '13px "Geist Mono", ui-monospace, Menlo, monospace',
       size: 60,
     } as uPlot.Axis;
@@ -249,6 +294,8 @@ import Shell from '../layouts/Shell.astro';
         return `<div title="${d.date} · TSS ${d.tss.toFixed(0)}" style="width: ${cell}px; height: ${cell}px; border-radius: 5px; background: ${colors[lvl]};"></div>`;
       })
       .join('');
+    const maxEl = document.getElementById('heatmap-max');
+    if (maxEl) maxEl.textContent = `peak day ${Math.round(max)} TSS`;
   }
 
   function todayIso() {
