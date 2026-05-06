@@ -42,6 +42,20 @@ export async function persistActivity(env: Env, input: PersistInput): Promise<vo
 
   const startedAt = Math.floor(activity.session.startedAt.getTime() / 1000);
 
+  // Pre-flight dedup against the partial unique index. A bare
+  // `ON CONFLICT(...) DO NOTHING` against a partial index in SQLite
+  // requires the WHERE clause to be repeated and is fragile across
+  // D1 versions; an explicit existence check is simpler and avoids
+  // the error path entirely.
+  if (job.externalSource && job.externalId) {
+    const dupe = await env.DB.prepare(
+      `SELECT id FROM activities WHERE external_source = ? AND external_id = ?`,
+    )
+      .bind(job.externalSource, job.externalId)
+      .first<{ id: string }>();
+    if (dupe) return;
+  }
+
   await env.DB.prepare(
     `INSERT INTO activities (
       id, athlete_id, source, sport,
@@ -52,8 +66,7 @@ export async function persistActivity(env: Env, input: PersistInput): Promise<vo
       speed_avg_ms, speed_max_ms,
       raw_r2_path, parsed_r2_path, visibility,
       external_source, external_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'private', ?, ?)
-     ON CONFLICT(external_source, external_id) DO NOTHING`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'private', ?, ?)`,
   )
     .bind(
       job.activityId,
