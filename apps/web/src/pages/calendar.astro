@@ -444,9 +444,9 @@ import Icon from '../components/Icon.astro';
           <span>${formatHm(totalSec) || '—'}</span>
           <span class="k">Dist</span>
           <span>${totalDist > 0 ? `${(totalDist / 1000).toFixed(1)} km` : '—'}</span>
-          <span class="k">Load</span>
+          <span class="k" data-metric="load" tabindex="0">Load</span>
           <span>${totalLoad > 0 ? totalLoad.toFixed(0) : '—'}</span>
-          <span class="k">kJ</span>
+          <span class="k" data-metric="kj" tabindex="0">kJ</span>
           <span>${totalKj > 0 ? totalKj.toFixed(0) : '—'}</span>
         </div>
         ${
@@ -471,9 +471,9 @@ import Icon from '../components/Icon.astro';
         ${
           pmc
             ? `<div class="cal-week-pmc">
-              <div><span class="k metric-label" style="color: var(--fg-muted);">CTL</span><div class="v">${pmc.ctl.toFixed(0)}</div></div>
-              <div><span class="k metric-label" style="color: var(--fg-muted);">ATL</span><div class="v">${pmc.atl.toFixed(0)}</div></div>
-              <div><span class="k metric-label" style="color: var(--fg-muted);">TSB</span><div class="v">${pmc.tsb.toFixed(0)}</div></div>
+              <div><span class="k metric-label" style="color: var(--fg-muted);" data-metric="ctl" tabindex="0">CTL</span><div class="v">${pmc.ctl.toFixed(0)}</div></div>
+              <div><span class="k metric-label" style="color: var(--fg-muted);" data-metric="atl" tabindex="0">ATL</span><div class="v">${pmc.atl.toFixed(0)}</div></div>
+              <div><span class="k metric-label" style="color: var(--fg-muted);" data-metric="tsb" tabindex="0">TSB</span><div class="v">${pmc.tsb.toFixed(0)}</div></div>
             </div>`
             : ''
         }
@@ -536,13 +536,16 @@ import Icon from '../components/Icon.astro';
     const dist = a.distanceM != null ? `${(a.distanceM / 1000).toFixed(1)} km` : '';
     const dur = formatHm(a.totalSeconds) || '0m';
     const stats: string[] = [];
-    if (a.hrAvg != null) stats.push(`<span><span class="k">HR</span> ${Math.round(a.hrAvg)}</span>`);
+    if (a.hrAvg != null)
+      stats.push(`<span><span class="k" data-metric="rhr" tabindex="0">HR</span> ${Math.round(a.hrAvg)}</span>`);
     if (a.powerAvg != null)
       stats.push(`<span><span class="k">P</span> ${Math.round(a.powerAvg)}w</span>`);
-    if (a.np != null) stats.push(`<span><span class="k">NP</span> ${Math.round(a.np)}w</span>`);
-    if (a.tss != null) stats.push(`<span><span class="k">TSS</span> ${a.tss.toFixed(0)}</span>`);
+    if (a.np != null)
+      stats.push(`<span><span class="k" data-metric="np" tabindex="0">NP</span> ${Math.round(a.np)}w</span>`);
+    if (a.tss != null)
+      stats.push(`<span><span class="k" data-metric="tss" tabindex="0">TSS</span> ${a.tss.toFixed(0)}</span>`);
     if (a.ascentM != null && a.ascentM > 0)
-      stats.push(`<span><span class="k">↑</span> ${Math.round(a.ascentM)}m</span>`);
+      stats.push(`<span><span class="k" data-metric="ascent" tabindex="0">↑</span> ${Math.round(a.ascentM)}m</span>`);
 
     const name = a.name ?? sentenceCase(sport);
     const source = sourceLabel(a);

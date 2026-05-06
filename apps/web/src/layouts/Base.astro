@@ -1,4 +1,6 @@
 ---
+import Glossary from '../components/Glossary.astro';
+
 interface Props {
   title?: string;
   description?: string;
@@ -28,6 +30,7 @@ const fullTitle = title === 'pacelore' ? 'pacelore' : `${title} · pacelore`;
   </head>
   <body>
     <slot />
+    <Glossary />
   </body>
 </html>
 

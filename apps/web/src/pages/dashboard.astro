@@ -19,19 +19,22 @@ import Shell from '../layouts/Shell.astro';
 
     <div class="panel">
       <div class="panel-header">
-        <h3 class="h3" style="font-size: 18px;">CTL · ATL · TSB</h3>
+        <h3 class="h3" style="font-size: 18px;" data-metric="pmc" tabindex="0">CTL · ATL · TSB</h3>
         <div
           class="row-end"
           style="display: flex; gap: 16px; font-family: var(--font-mono); font-size: 12px; color: var(--fg-muted);"
         >
           <span style="display: inline-flex; align-items: center; gap: 6px;">
-            <span style="width: 14px; height: 2px; background: var(--pace-500);"></span>CTL
+            <span style="width: 14px; height: 2px; background: var(--pace-500);"></span>
+            <span data-metric="ctl" tabindex="0">CTL</span>
           </span>
           <span style="display: inline-flex; align-items: center; gap: 6px;">
-            <span style="width: 14px; border-top: 2px dashed var(--ink-700);"></span>ATL
+            <span style="width: 14px; border-top: 2px dashed var(--ink-700);"></span>
+            <span data-metric="atl" tabindex="0">ATL</span>
           </span>
           <span style="display: inline-flex; align-items: center; gap: 6px;">
-            <span style="width: 14px; height: 8px; background: oklch(0.66 0.11 150 / 0.18);"></span>TSB
+            <span style="width: 14px; height: 8px; background: oklch(0.66 0.11 150 / 0.18);"></span>
+            <span data-metric="tsb" tabindex="0">TSB</span>
           </span>
         </div>
       </div>
@@ -42,7 +45,7 @@ import Shell from '../layouts/Shell.astro';
 
     <div class="panel">
       <div class="panel-header">
-        <h3 class="h3" style="font-size: 16px;">Daily TSS</h3>
+        <h3 class="h3" style="font-size: 16px;" data-metric="tss" tabindex="0">Daily TSS</h3>
       </div>
       <div class="panel-body">
         <div id="tss-chart" style="width: 100%;"></div>
@@ -155,25 +158,35 @@ import Shell from '../layouts/Shell.astro';
     const tss7prev = days.slice(-14, -7).reduce((a, b) => a + b.tss, 0);
     const tssDelta = tss7 - tss7prev;
     const ctlDelta = last.ctl - (days[Math.max(0, days.length - 8)]?.ctl ?? last.ctl);
-    const tiles: { label: string; value: string; delta?: string; deltaNeg?: boolean }[] = [
+    const tiles: {
+      label: string;
+      metric: string;
+      value: string;
+      delta?: string;
+      deltaNeg?: boolean;
+    }[] = [
       {
         label: 'ctl · fitness',
+        metric: 'ctl',
         value: last.ctl.toFixed(1),
         delta: `${ctlDelta >= 0 ? '+' : ''}${ctlDelta.toFixed(1)} in 7d`,
         deltaNeg: ctlDelta < 0,
       },
       {
         label: 'atl · fatigue',
+        metric: 'atl',
         value: last.atl.toFixed(1),
       },
       {
         label: 'tsb · form',
+        metric: 'tsb',
         value: last.tsb.toFixed(1),
         delta: last.tsb < -10 ? 'loaded' : last.tsb > 10 ? 'fresh' : 'neutral',
         deltaNeg: last.tsb < -10,
       },
       {
         label: '7-day tss',
+        metric: 'tss',
         value: tss7.toFixed(0),
         delta: `${tssDelta >= 0 ? '+' : ''}${tssDelta.toFixed(0)} vs prev 7d`,
         deltaNeg: tssDelta < 0,
@@ -183,7 +196,7 @@ import Shell from '../layouts/Shell.astro';
       .map(
         (t) => `
         <div class="tile">
-          <span class="label">${t.label}</span>
+          <span class="label" data-metric="${t.metric}" tabindex="0">${t.label}</span>
           <span class="v">${t.value}</span>
           ${t.delta ? `<span class="delta ${t.deltaNeg ? 'neg' : ''}">${t.delta}</span>` : ''}
         </div>`,

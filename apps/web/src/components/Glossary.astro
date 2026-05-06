@@ -1,0 +1,170 @@
+---
+/**
+ * Glossary tooltip — page-wide hover-explainer for metric labels.
+ *
+ * How it works:
+ *   - Catalog of terms in `metric-definitions.ts` is serialized into
+ *     a single inline JSON blob.
+ *   - Client script attaches one mouseenter listener at <body> and
+ *     uses event-delegation: any element with `data-metric="<key>"`
+ *     pops a tooltip on hover/focus. Saves us from sprinkling
+ *     wrappers everywhere.
+ *   - Mobile: `tap to toggle` — first tap opens, second closes.
+ *   - Tooltip auto-positions to stay on-screen.
+ */
+import { METRICS } from '../data/metric-definitions.ts';
+const json = JSON.stringify(METRICS);
+---
+
+<div
+  id="glossary-tip"
+  role="tooltip"
+  aria-hidden="true"
+  style="position: fixed; z-index: 1000; max-width: 360px; padding: 14px 16px; border-radius: 10px; background: var(--surface-popover); border: 1px solid var(--border-strong); box-shadow: var(--shadow-pop); color: var(--fg); font-size: 13px; line-height: 1.5; pointer-events: none; opacity: 0; transform: translateY(-4px); transition: opacity 120ms var(--ease-out), transform 120ms var(--ease-out); display: none;"
+>
+</div>
+
+<script is:inline define:vars={{ DICTIONARY: json }}>
+  (() => {
+    const dict = JSON.parse(DICTIONARY);
+    const tip = document.getElementById('glossary-tip');
+    if (!tip) return;
+    let activeAnchor = null;
+
+    function render(def) {
+      tip.innerHTML = `
+        <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px;">
+          <strong style="font-size: 13px; font-weight: 600;">${escape(def.title)}</strong>
+          ${def.source ? `<span style="font-family: var(--font-mono); font-size: 10px; color: var(--fg-subtle); letter-spacing: 0.04em; text-transform: uppercase;">${escape(def.source)}</span>` : ''}
+        </div>
+        <p style="margin: 0 0 10px; color: var(--fg);">${escape(def.plain)}</p>
+        <p style="margin: 0; padding-top: 8px; border-top: 1px solid var(--border); font-family: var(--font-mono); font-size: 11.5px; line-height: 1.5; color: var(--fg-muted);">
+          <span class="metric-label" style="display: block; margin-bottom: 4px; color: var(--fg-subtle);">official</span>
+          ${escape(def.official)}
+        </p>
+      `;
+    }
+
+    function place(target) {
+      const r = target.getBoundingClientRect();
+      tip.style.display = 'block';
+      // Show first to measure.
+      requestAnimationFrame(() => {
+        const tipRect = tip.getBoundingClientRect();
+        const margin = 8;
+        let left = r.left + r.width / 2 - tipRect.width / 2;
+        let top = r.bottom + margin;
+        // Flip if it would overflow bottom.
+        if (top + tipRect.height + margin > window.innerHeight) {
+          top = r.top - tipRect.height - margin;
+        }
+        // Clamp to viewport.
+        left = Math.max(margin, Math.min(window.innerWidth - tipRect.width - margin, left));
+        top = Math.max(margin, top);
+        tip.style.left = `${left}px`;
+        tip.style.top = `${top}px`;
+        tip.style.opacity = '1';
+        tip.style.transform = 'translateY(0)';
+      });
+    }
+
+    function hide() {
+      activeAnchor = null;
+      tip.style.opacity = '0';
+      tip.style.transform = 'translateY(-4px)';
+      tip.setAttribute('aria-hidden', 'true');
+      setTimeout(() => {
+        if (!activeAnchor) tip.style.display = 'none';
+      }, 140);
+    }
+
+    function show(target) {
+      const key = (target.dataset.metric || '').toLowerCase();
+      const def = dict[key];
+      if (!def) return;
+      activeAnchor = target;
+      render(def);
+      tip.setAttribute('aria-hidden', 'false');
+      place(target);
+    }
+
+    // Pointer-based hover (desktop).
+    document.addEventListener('mouseover', (ev) => {
+      const t = ev.target instanceof Element ? ev.target.closest('[data-metric]') : null;
+      if (!t) return;
+      show(t);
+    });
+    document.addEventListener('mouseout', (ev) => {
+      const t = ev.target instanceof Element ? ev.target.closest('[data-metric]') : null;
+      if (!t) return;
+      // Avoid flicker between adjacent labels.
+      const next = ev.relatedTarget instanceof Element
+        ? ev.relatedTarget.closest('[data-metric]')
+        : null;
+      if (next === t) return;
+      if (!next) hide();
+    });
+
+    // Keyboard accessibility — focus / blur on the labels.
+    document.addEventListener('focusin', (ev) => {
+      const t = ev.target instanceof Element ? ev.target.closest('[data-metric]') : null;
+      if (t) show(t);
+    });
+    document.addEventListener('focusout', (ev) => {
+      const t = ev.target instanceof Element ? ev.target.closest('[data-metric]') : null;
+      if (t) hide();
+    });
+
+    // Mobile — tap to toggle.
+    document.addEventListener('click', (ev) => {
+      const t = ev.target instanceof Element ? ev.target.closest('[data-metric]') : null;
+      if (!t) {
+        if (activeAnchor) hide();
+        return;
+      }
+      if (window.matchMedia('(hover: none)').matches) {
+        if (activeAnchor === t) {
+          hide();
+        } else {
+          show(t);
+        }
+      }
+    });
+
+    // Esc closes the tip.
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && activeAnchor) hide();
+    });
+    // Hide on scroll so an anchored tooltip doesn't drift off its label.
+    window.addEventListener('scroll', () => activeAnchor && hide(), { passive: true });
+
+    function escape(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+  })();
+</script>
+
+<style is:global>
+  [data-metric] {
+    cursor: help;
+    position: relative;
+  }
+  [data-metric]::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    border-bottom: 1px dotted var(--fg-subtle);
+    pointer-events: none;
+    opacity: 0.55;
+  }
+  [data-metric]:hover::after,
+  [data-metric]:focus-visible::after {
+    opacity: 1;
+  }
+</style>

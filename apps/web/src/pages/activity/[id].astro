@@ -290,14 +290,30 @@ const { id } = Astro.params;
     if (ifMetric) cells.push({ label: 'if', value: ifMetric.value.toFixed(2) });
     summary.innerHTML = cells
       .slice(0, 6)
-      .map(
-        (c) => `
-        <div class="tile">
-          <span class="label">${escape(c.label)}</span>
-          <span class="v">${escape(c.value)}${c.unit ? `<span class="u">${escape(c.unit)}</span>` : ''}</span>
-        </div>`,
-      )
+      .map((c) => {
+        const key = labelToMetric(c.label);
+        const labelAttr = key ? ` data-metric="${key}" tabindex="0"` : '';
+        return `
+          <div class="tile">
+            <span class="label"${labelAttr}>${escape(c.label)}</span>
+            <span class="v">${escape(c.value)}${c.unit ? `<span class="u">${escape(c.unit)}</span>` : ''}</span>
+          </div>`;
+      })
       .join('');
+  }
+
+  function labelToMetric(label: string): string | null {
+    const m: Record<string, string> = {
+      tss: 'tss',
+      np: 'np',
+      if: 'if',
+      'avg power': 'np',
+      'avg hr': 'rhr',
+      trimp: 'trimp',
+      elev: 'ascent',
+      kj: 'kj',
+    };
+    return m[label.toLowerCase()] ?? null;
   }
 
   function renderRouteMap(samples: Sample[]) {
