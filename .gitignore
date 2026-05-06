@@ -50,3 +50,6 @@ coverage/
 *.sqlite
 *.sqlite3
 *.db
+
+# Local-only drafts
+marketing/

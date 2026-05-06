@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build",
+    "build": "astro build && printf '_worker.js\\n_routes.json\\n' > dist/.assetsignore",
     "preview": "astro preview",
+    "deploy": "pnpm build && wrangler deploy --config wrangler.toml",
     "typecheck": "astro check",
     "test": "echo \"web tests — wired with feature tasks\" && exit 0"
   },

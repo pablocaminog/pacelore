@@ -1,0 +1,19 @@
+name = "pacelore-web"
+main = "dist/_worker.js/index.js"
+compatibility_date = "2025-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+routes = [
+  { pattern = "pacelore.com", custom_domain = true },
+  { pattern = "www.pacelore.com", custom_domain = true },
+]
+
+[vars]
+PACELORE_API_ORIGIN = "https://api.pacelore.com"
+
+[assets]
+binding = "ASSETS"
+directory = "./dist"
+
+[observability.logs]
+enabled = true
