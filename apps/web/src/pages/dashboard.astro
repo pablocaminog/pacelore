@@ -169,9 +169,10 @@ import Shell from '../layouts/Shell.astro';
     el.innerHTML = '';
     const opts: uPlot.Options = {
       width: el.clientWidth || 900,
-      height: 300,
+      height: 360,
       cursor: { drag: { x: true, y: false } },
       scales: { x: { time: true } },
+      axes: [axisX(), axisY()],
       series: [
         {},
         { label: 'CTL', stroke: '#C8FA1F', width: 2 },
@@ -189,8 +190,9 @@ import Shell from '../layouts/Shell.astro';
     el.innerHTML = '';
     const opts: uPlot.Options = {
       width: el.clientWidth || 900,
-      height: 200,
+      height: 240,
       scales: { x: { time: true } },
+      axes: [axisX(), axisY()],
       series: [
         {},
         {
@@ -201,6 +203,26 @@ import Shell from '../layouts/Shell.astro';
       ],
     };
     new uPlot(opts, [t, tss], el);
+  }
+
+  function axisX() {
+    return {
+      stroke: 'var(--fg-muted)',
+      grid: { stroke: 'var(--border)', width: 1 },
+      ticks: { stroke: 'var(--border)', width: 1, size: 6 },
+      font: '13px "Geist Mono", ui-monospace, Menlo, monospace',
+      size: 56,
+      space: 90,
+    } as uPlot.Axis;
+  }
+  function axisY() {
+    return {
+      stroke: 'var(--fg-muted)',
+      grid: { stroke: 'var(--border)', width: 1 },
+      ticks: { stroke: 'var(--border)', width: 1, size: 6 },
+      font: '13px "Geist Mono", ui-monospace, Menlo, monospace',
+      size: 60,
+    } as uPlot.Axis;
   }
 
   function renderHeatmap(days: Day[]) {
@@ -214,16 +236,17 @@ import Shell from '../layouts/Shell.astro';
     ];
     const max = Math.max(50, ...days.map((d) => d.tss));
     const el = document.getElementById('heatmap')!;
+    const cell = 26;
     el.style.display = 'grid';
-    el.style.gridTemplateRows = 'repeat(7, 18px)';
+    el.style.gridTemplateRows = `repeat(7, ${cell}px)`;
     el.style.gridAutoFlow = 'column';
-    el.style.gridAutoColumns = '18px';
-    el.style.gap = '3px';
+    el.style.gridAutoColumns = `${cell}px`;
+    el.style.gap = '4px';
     el.innerHTML = days
       .map((d) => {
         const r = d.tss / max;
         const lvl = d.tss <= 0 ? 0 : r < 0.2 ? 1 : r < 0.4 ? 2 : r < 0.6 ? 3 : r < 0.85 ? 4 : 5;
-        return `<div title="${d.date} · TSS ${d.tss.toFixed(0)}" style="width: 18px; height: 18px; border-radius: 4px; background: ${colors[lvl]};"></div>`;
+        return `<div title="${d.date} · TSS ${d.tss.toFixed(0)}" style="width: ${cell}px; height: ${cell}px; border-radius: 5px; background: ${colors[lvl]};"></div>`;
       })
       .join('');
   }
