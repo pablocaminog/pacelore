@@ -471,3 +471,249 @@ garminRoutes.post('/webhooks/garmin/activities', async (c) => {
   }
   return c.json({ ok: true, queued });
 });
+
+// ------------------------- Wellness webhooks --------------------------
+//
+// Garmin's Health/Wellness API pushes daily summaries, sleep, body comp,
+// HRV, etc. Each push wraps an array under a typed key. We resolve the
+// athlete via oauth_identities → user_id, then upsert into
+// wellness_daily / body_composition.
+//
+// Each route is best-effort idempotent on (athlete_id, date, source) or
+// (athlete_id, measured_at) — a re-push of the same day overwrites.
+
+interface GarminDailySummary {
+  userId: string;
+  calendarDate: string; // YYYY-MM-DD
+  steps?: number;
+  activeKilocalories?: number;
+  bmrKilocalories?: number;
+  averageStressLevel?: number;
+  restingHeartRateInBeatsPerMinute?: number;
+  bodyBatteryChargedValue?: number;
+  bodyBatteryDrainedValue?: number;
+}
+interface GarminSleepSummary {
+  userId: string;
+  calendarDate: string;
+  durationInSeconds?: number;
+  deepSleepDurationInSeconds?: number;
+  lightSleepDurationInSeconds?: number;
+  remSleepInSeconds?: number;
+  awakeDurationInSeconds?: number;
+  overallSleepScore?: { value?: number };
+  hrvSummary?: { lastNightAvg?: number };
+}
+interface GarminBodyComp {
+  userId: string;
+  measurementTimeInSeconds: number;
+  weightInGrams?: number;
+  bodyFatInPercent?: number;
+  bodyWaterInPercent?: number;
+  muscleMassInGrams?: number;
+  boneMassInGrams?: number;
+  visceralFatRating?: number;
+}
+interface GarminUserMetrics {
+  userId: string;
+  calendarDate: string;
+  vo2Max?: number;
+}
+
+async function resolveAthleteId(env: Env, garminUserId: string): Promise<string | null> {
+  const row = await env.DB.prepare(
+    `SELECT user_id AS userId FROM oauth_identities
+      WHERE provider = 'garmin' AND external_id = ?`,
+  )
+    .bind(garminUserId)
+    .first<{ userId: string }>();
+  return row?.userId ?? null;
+}
+
+async function upsertWellnessDaily(
+  env: Env,
+  athleteId: string,
+  date: string,
+  patch: Record<string, number | null>,
+  rawPayload: unknown,
+): Promise<void> {
+  // SQLite-friendly upsert: pull existing row (if any) and merge.
+  const existing = await env.DB.prepare(
+    `SELECT id FROM wellness_daily WHERE athlete_id = ? AND date = ? AND source = 'garmin'`,
+  )
+    .bind(athleteId, date)
+    .first<{ id: string }>();
+
+  const cols = Object.keys(patch);
+  if (cols.length === 0) return;
+
+  if (existing) {
+    const sets = cols.map((c) => `${c} = COALESCE(?, ${c})`).join(', ');
+    await env.DB.prepare(
+      `UPDATE wellness_daily SET ${sets}, updated_at = unixepoch(), raw_payload = ?
+       WHERE id = ?`,
+    )
+      .bind(...cols.map((c) => patch[c] ?? null), JSON.stringify(rawPayload), existing.id)
+      .run();
+    return;
+  }
+  const id = uuidv7();
+  await env.DB.prepare(
+    `INSERT INTO wellness_daily (id, athlete_id, date, source, ${cols.join(', ')}, raw_payload)
+     VALUES (?, ?, ?, 'garmin', ${cols.map(() => '?').join(', ')}, ?)`,
+  )
+    .bind(
+      id,
+      athleteId,
+      date,
+      ...cols.map((c) => patch[c] ?? null),
+      JSON.stringify(rawPayload),
+    )
+    .run();
+}
+
+garminRoutes.post('/webhooks/garmin/dailies', async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { dailies?: GarminDailySummary[] };
+  let processed = 0;
+  for (const d of body.dailies ?? []) {
+    const athleteId = await resolveAthleteId(c.env, String(d.userId));
+    if (!athleteId) continue;
+    await upsertWellnessDaily(
+      c.env,
+      athleteId,
+      d.calendarDate,
+      {
+        steps: d.steps ?? null,
+        calories_active: d.activeKilocalories ?? null,
+        calories_total:
+          d.activeKilocalories != null && d.bmrKilocalories != null
+            ? d.activeKilocalories + d.bmrKilocalories
+            : null,
+        rhr: d.restingHeartRateInBeatsPerMinute ?? null,
+        body_battery: d.bodyBatteryChargedValue ?? null,
+        stress_avg: d.averageStressLevel ?? null,
+      },
+      d,
+    );
+    processed++;
+  }
+  return c.json({ ok: true, processed });
+});
+
+garminRoutes.post('/webhooks/garmin/sleeps', async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { sleeps?: GarminSleepSummary[] };
+  let processed = 0;
+  for (const s of body.sleeps ?? []) {
+    const athleteId = await resolveAthleteId(c.env, String(s.userId));
+    if (!athleteId) continue;
+    await upsertWellnessDaily(
+      c.env,
+      athleteId,
+      s.calendarDate,
+      {
+        sleep_seconds: s.durationInSeconds ?? null,
+        deep_seconds: s.deepSleepDurationInSeconds ?? null,
+        light_seconds: s.lightSleepDurationInSeconds ?? null,
+        rem_seconds: s.remSleepInSeconds ?? null,
+        awake_seconds: s.awakeDurationInSeconds ?? null,
+        sleep_score: s.overallSleepScore?.value ?? null,
+        hrv_overnight: s.hrvSummary?.lastNightAvg ?? null,
+      },
+      s,
+    );
+    processed++;
+  }
+  return c.json({ ok: true, processed });
+});
+
+garminRoutes.post('/webhooks/garmin/body-comp', async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as {
+    bodyComps?: GarminBodyComp[];
+  };
+  let processed = 0;
+  for (const b of body.bodyComps ?? []) {
+    const athleteId = await resolveAthleteId(c.env, String(b.userId));
+    if (!athleteId) continue;
+    const weightKg = b.weightInGrams != null ? b.weightInGrams / 1000 : null;
+    const muscleKg = b.muscleMassInGrams != null ? b.muscleMassInGrams / 1000 : null;
+    const boneKg = b.boneMassInGrams != null ? b.boneMassInGrams / 1000 : null;
+    await c.env.DB.prepare(
+      `INSERT INTO body_composition (id, athlete_id, measured_at, source,
+         weight_kg, body_fat_pct, muscle_mass_kg, bone_mass_kg,
+         body_water_pct, visceral_fat, raw_payload)
+       VALUES (?, ?, ?, 'garmin', ?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        uuidv7(),
+        athleteId,
+        b.measurementTimeInSeconds,
+        weightKg,
+        b.bodyFatInPercent ?? null,
+        muscleKg,
+        boneKg,
+        b.bodyWaterInPercent ?? null,
+        b.visceralFatRating ?? null,
+        JSON.stringify(b),
+      )
+      .run();
+    if (weightKg != null) {
+      const date = new Date(b.measurementTimeInSeconds * 1000).toISOString().slice(0, 10);
+      await upsertWellnessDaily(
+        c.env,
+        athleteId,
+        date,
+        {
+          weight_kg: weightKg,
+          body_fat_pct: b.bodyFatInPercent ?? null,
+        },
+        b,
+      );
+    }
+    processed++;
+  }
+  return c.json({ ok: true, processed });
+});
+
+garminRoutes.post('/webhooks/garmin/user-metrics', async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { userMetrics?: GarminUserMetrics[] };
+  let processed = 0;
+  for (const m of body.userMetrics ?? []) {
+    const athleteId = await resolveAthleteId(c.env, String(m.userId));
+    if (!athleteId) continue;
+    await upsertWellnessDaily(
+      c.env,
+      athleteId,
+      m.calendarDate,
+      { vo2max: m.vo2Max ?? null },
+      m,
+    );
+    processed++;
+  }
+  return c.json({ ok: true, processed });
+});
+
+// Wellness query for the calendar / dashboard.
+garminRoutes.get('/me/wellness', requireSession(), async (c) => {
+  const session = c.get('session');
+  const url = new URL(c.req.url);
+  const from = url.searchParams.get('from');
+  const to = url.searchParams.get('to');
+  if (!from || !to) {
+    throw new HTTPException(400, { message: 'from and to required' });
+  }
+  const rows = await c.env.DB.prepare(
+    `SELECT date, source, sleep_seconds AS sleepSeconds, sleep_score AS sleepScore,
+            deep_seconds AS deepSeconds, light_seconds AS lightSeconds,
+            rem_seconds AS remSeconds, awake_seconds AS awakeSeconds,
+            rhr, hrv_overnight AS hrv, steps,
+            calories_active AS caloriesActive, calories_total AS caloriesTotal,
+            body_battery AS bodyBattery, stress_avg AS stressAvg,
+            weight_kg AS weightKg, body_fat_pct AS bodyFatPct, vo2max
+       FROM wellness_daily
+      WHERE athlete_id = ? AND date BETWEEN ? AND ?
+      ORDER BY date ASC`,
+  )
+    .bind(session.userId, from, to)
+    .all();
+  return c.json({ items: rows.results ?? [] });
+});

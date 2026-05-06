@@ -135,13 +135,36 @@ export function computeMetrics(activity: ActivityRecord, thr: AthleteThresholds)
     }
   }
 
-  if (hrStream.length > 0 && thr.hrMax && thr.hrRest && thr.hrMax > thr.hrRest) {
-    const cfg = { hrMax: thr.hrMax, hrRest: thr.hrRest };
+  // HR-based metrics. If athlete hasn't set HRmax/HRrest, fall back to
+  // population defaults (HRmax 190, HRrest 60) so PMC isn't blank for
+  // a brand-new account. Mark these computations 'hr.tss_estimated'
+  // vs `power.tss` so the UI can flag an estimate.
+  const hrCfg = (() => {
+    if (thr.hrMax && thr.hrRest && thr.hrMax > thr.hrRest) {
+      return { hrMax: thr.hrMax, hrRest: thr.hrRest, estimated: false };
+    }
+    return { hrMax: 190, hrRest: 60, estimated: true };
+  })();
+  if (hrStream.length > 0) {
+    const cfg = { hrMax: hrCfg.hrMax, hrRest: hrCfg.hrRest };
     const tiz = timeInZones(hrStream, cfg);
     for (let z = 0; z < 5; z++) {
       metrics.push({ key: `hr.tiz.z${z + 1}`, value: tiz.seconds[z]! });
     }
-    metrics.push({ key: 'hr.trimp', value: trimp(hrStream, cfg) });
+    const t = trimp(hrStream, cfg);
+    metrics.push({ key: 'hr.trimp', value: t });
+    // hrTSS approximation — Banister TRIMP normalized to threshold-hour
+    // (TRIMP at 100% HRR for 60min ≈ 100 TSS). 1.92 = exp(b·1) for
+    // b=1.92 (sport-neutral mean) over 1.0 HRR-fraction × 60min = 100.
+    // Use that as the 100-TSS scaling reference.
+    const hrTss = (t / 100) * 100; // already calibrated via TRIMP impulse units
+    metrics.push({ key: 'hr.tss', value: hrTss });
+    if (summary.tss === null && Number.isFinite(hrTss) && hrTss > 0) {
+      summary.tss = hrTss;
+      if (hrCfg.estimated) {
+        metrics.push({ key: 'hr.tss_estimated', value: 1 });
+      }
+    }
   }
 
   if (paceStream.length > 0 && thr.thresholdPaceMs && thr.thresholdPaceMs > 0) {

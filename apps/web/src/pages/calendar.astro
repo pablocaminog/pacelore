@@ -260,6 +260,18 @@ import Icon from '../components/Icon.astro';
     externalId: string | null;
   };
   type PmcDay = { date: string; ctl: number; atl: number; tsb: number; tss: number };
+  type WellnessDay = {
+    date: string;
+    source: string;
+    sleepSeconds: number | null;
+    sleepScore: number | null;
+    rhr: number | null;
+    hrv: number | null;
+    steps: number | null;
+    weightKg: number | null;
+    bodyBattery: number | null;
+    stressAvg: number | null;
+  };
 
   const subtitle = document.getElementById('cal-subtitle')!;
   const wrap = document.getElementById('cal-wrap')!;
@@ -297,11 +309,14 @@ import Icon from '../components/Icon.astro';
     const toIso = isoDate(sunday);
     wrap.innerHTML = '<div class="cal-loading caption">Loading…</div>';
 
-    const [actsRes, pmcRes] = await Promise.all([
+    const [actsRes, pmcRes, wellRes] = await Promise.all([
       fetch(`/api/v1/me/calendar/activities?from=${fromIso}&to=${toIso}`, {
         credentials: 'include',
       }),
       fetch(`/api/v1/athletes/${user.id}/pmc?from=${fromIso}&to=${toIso}`, {
+        credentials: 'include',
+      }),
+      fetch(`/api/v1/me/wellness?from=${fromIso}&to=${toIso}`, {
         credentials: 'include',
       }),
     ]);
@@ -312,6 +327,10 @@ import Icon from '../components/Icon.astro';
     const acts = ((await actsRes.json()) as { items: Activity[] }).items;
     const pmc = pmcRes.ok ? ((await pmcRes.json()) as { days: PmcDay[] }).days : [];
     const pmcByDate = new Map(pmc.map((d) => [d.date, d]));
+    const wellness = wellRes.ok
+      ? ((await wellRes.json()) as { items: WellnessDay[] }).items
+      : [];
+    const wellByDate = new Map(wellness.map((w) => [w.date, w]));
 
     // Bucket activities by ISO date string (athlete-local — UTC for now).
     const byDay = new Map<string, Activity[]>();
@@ -331,7 +350,7 @@ import Icon from '../components/Icon.astro';
       weekMonday.setUTCDate(monday.getUTCDate() + i * 7);
       const weekSunday = new Date(weekMonday);
       weekSunday.setUTCDate(weekMonday.getUTCDate() + 6);
-      grid.push(buildWeek(weekMonday, weekSunday, byDay, pmcByDate, today));
+      grid.push(buildWeek(weekMonday, weekSunday, byDay, pmcByDate, wellByDate, today));
     }
 
     wrap.innerHTML = `<div class="cal-grid">${grid.join('')}</div>`;
@@ -351,6 +370,7 @@ import Icon from '../components/Icon.astro';
     sunday: Date,
     byDay: Map<string, Activity[]>,
     pmcByDate: Map<string, PmcDay>,
+    wellByDate: Map<string, WellnessDay>,
     today: string,
   ): string {
     let totalSec = 0;
@@ -375,7 +395,7 @@ import Icon from '../components/Icon.astro';
         if (a.distanceM)
           sportDists.set(a.sport, (sportDists.get(a.sport) ?? 0) + a.distanceM);
       }
-      dayCells.push(buildDay(day, key, acts, today));
+      dayCells.push(buildDay(day, key, acts, wellByDate.get(key) ?? null, today));
     }
 
     const sundayKey = isoDate(sunday);
@@ -431,7 +451,13 @@ import Icon from '../components/Icon.astro';
     `;
   }
 
-  function buildDay(date: Date, key: string, acts: Activity[], today: string): string {
+  function buildDay(
+    date: Date,
+    key: string,
+    acts: Activity[],
+    well: WellnessDay | null,
+    today: string,
+  ): string {
     const isToday = key === today;
     const isFuture = key > today;
     const cards = acts.map(buildCard).join('');
@@ -439,14 +465,36 @@ import Icon from '../components/Icon.astro';
       month: 'short',
       timeZone: 'UTC',
     });
+    const wellRow = well ? buildWellnessRow(well) : '';
     return `
       <div class="cal-day${isToday ? ' today' : ''}">
         <div class="cal-day-head ${isFuture ? 'future' : ''}">
           <span>${monthShort} ${date.getUTCDate()}</span>
+          ${wellRow}
         </div>
         ${cards}
       </div>
     `;
+  }
+
+  function buildWellnessRow(w: WellnessDay): string {
+    const parts: string[] = [];
+    if (w.sleepSeconds != null) {
+      const h = Math.floor(w.sleepSeconds / 3600);
+      const m = Math.floor((w.sleepSeconds % 3600) / 60);
+      parts.push(
+        `<span title="Sleep">🌙 ${h}h${String(m).padStart(2, '0')}${
+          w.sleepScore != null ? ` · ${w.sleepScore}` : ''
+        }</span>`,
+      );
+    }
+    if (w.rhr != null) parts.push(`<span title="Resting HR">♥ ${w.rhr}</span>`);
+    if (w.hrv != null) parts.push(`<span title="HRV (ms)">HRV ${Math.round(w.hrv)}</span>`);
+    if (w.steps != null && w.steps > 0)
+      parts.push(`<span title="Steps">${(w.steps / 1000).toFixed(1)}k</span>`);
+    if (w.weightKg != null) parts.push(`<span title="Weight">${w.weightKg.toFixed(1)}kg</span>`);
+    if (parts.length === 0) return '';
+    return `<span class="cal-wellness" style="margin-left: auto; display: flex; gap: 6px; font-size: 10px; color: var(--fg-subtle);">${parts.join(' ')}</span>`;
   }
 
   function buildCard(a: Activity): string {

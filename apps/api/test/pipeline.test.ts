@@ -76,7 +76,7 @@ describe('processIngestJob', () => {
     await expect(processIngestJob(env, job)).rejects.toThrow(/raw object missing/);
   });
 
-  it('still persists when the athlete has no FTP (skips power-derived metrics)', async () => {
+  it('still persists when the athlete has no FTP — power metrics skipped, hrTSS may estimate', async () => {
     const env = fakeEnv();
     (env.DB as unknown as FakeD1).users.push({
       id: 'u2',
@@ -94,6 +94,9 @@ describe('processIngestJob', () => {
     await processIngestJob(env, job);
     const db = env.DB as unknown as FakeD1;
     expect(db.activities).toHaveLength(1);
-    expect(db.activities[0]!.tss).toBeNull();
+    // np stays null (no power stream), but tss may be a non-zero
+    // hrTSS estimate when HR is present in the fixture and the
+    // population-default HRmax/HRrest fallback fires.
+    expect(db.activities[0]!.np).toBeNull();
   });
 });
