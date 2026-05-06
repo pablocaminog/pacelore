@@ -1,0 +1,289 @@
+---
+import Marketing from '../layouts/Marketing.astro';
+import { DEMO } from '../data/demo-fixture.ts';
+
+// Tally: 12-week aggregates for the hero tiles.
+const last7 = DEMO.pmc.slice(-7);
+const last7Tss = last7.reduce((a, d) => a + d.tss, 0);
+const last = DEMO.pmc[DEMO.pmc.length - 1]!;
+const ctl7Ago = DEMO.pmc[Math.max(0, DEMO.pmc.length - 8)]!.ctl;
+const ctlDelta = +(last.ctl - ctl7Ago).toFixed(1);
+
+const totalTss = DEMO.activities.reduce((a, x) => a + x.tss, 0);
+const totalDur = DEMO.activities.reduce((a, x) => a + x.durationSec, 0);
+const totalDist = DEMO.activities.reduce((a, x) => a + x.distanceM, 0);
+---
+
+<Marketing
+  title="pacelore demo · live PMC, calendar, and activities"
+  description="See pacelore in action without signing up. Live CTL/ATL/TSB chart, calendar grid, and per-activity metrics — read-only sample data."
+>
+  <div class="marketing-content" style="gap: 32px;">
+    <div
+      class="panel"
+      style="background: var(--accent-soft); border-color: var(--pace-300); padding: 16px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;"
+    >
+      <span class="chip chip-pace" style="font-weight: 600;">DEMO</span>
+      <span class="body-sm" style="flex: 1;">
+        Read-only sample data. Numbers are fictional but plausible — a 12-week build for a cyclist
+        + runner.
+      </span>
+      <a class="btn btn-primary btn-sm" href="/register">Create my own →</a>
+    </div>
+
+    <header>
+      <h1 class="h1" style="font-size: 32px;">Performance management</h1>
+      <p class="muted body-sm" style="margin-top: 4px;">
+        {DEMO.athlete.displayName} · last 90 days · {DEMO.activities.length} activities
+      </p>
+    </header>
+
+    <section class="grid-tiles grid-cols-4">
+      <div class="tile">
+        <span class="label" data-metric="ctl" tabindex="0">ctl · fitness</span>
+        <span class="v">{last.ctl.toFixed(1)}</span>
+        <span class={`delta ${ctlDelta < 0 ? 'neg' : ''}`}
+          >{ctlDelta >= 0 ? '+' : ''}{ctlDelta} in 7d</span
+        >
+      </div>
+      <div class="tile">
+        <span class="label" data-metric="atl" tabindex="0">atl · fatigue</span>
+        <span class="v">{last.atl.toFixed(1)}</span>
+      </div>
+      <div class="tile">
+        <span class="label" data-metric="tsb" tabindex="0">tsb · form</span>
+        <span class="v">{last.tsb.toFixed(1)}</span>
+        <span class={`delta ${last.tsb < -10 ? 'neg' : ''}`}>
+          {last.tsb < -10 ? 'loaded' : last.tsb > 10 ? 'fresh' : 'neutral'}
+        </span>
+      </div>
+      <div class="tile">
+        <span class="label" data-metric="tss" tabindex="0">7-day tss</span>
+        <span class="v">{last7Tss}</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h3 class="h3" style="font-size: 18px;" data-metric="pmc" tabindex="0">CTL · ATL · TSB</h3>
+        <div
+          class="row-end"
+          style="display: flex; gap: 16px; font-family: var(--font-mono); font-size: 12px; color: var(--fg-muted);"
+        >
+          <span style="display: inline-flex; align-items: center; gap: 6px;">
+            <span style="width: 14px; height: 2px; background: var(--pace-500);"></span>
+            <span data-metric="ctl" tabindex="0">CTL</span>
+          </span>
+          <span style="display: inline-flex; align-items: center; gap: 6px;">
+            <span style="width: 14px; border-top: 2px dashed var(--ink-700);"></span>
+            <span data-metric="atl" tabindex="0">ATL</span>
+          </span>
+          <span style="display: inline-flex; align-items: center; gap: 6px;">
+            <span style="width: 14px; height: 8px; background: oklch(0.66 0.11 150 / 0.18);"></span>
+            <span data-metric="tsb" tabindex="0">TSB</span>
+          </span>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="demo-pmc" style="width: 100%; height: 360px;"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h3 class="h3" style="font-size: 16px;" data-metric="tss" tabindex="0">Daily TSS</h3>
+        <span class="row-end caption" style="font-family: var(--font-mono);">
+          Σ {totalTss} TSS · {(totalDist / 1000).toFixed(0)} km · {Math.round(totalDur / 3600)} h
+        </span>
+      </div>
+      <div class="panel-body">
+        <div id="demo-tss" style="width: 100%; height: 240px;"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h3 class="h3" style="font-size: 16px;">Recent activities</h3>
+        <span class="row-end caption">Per-card source attribution. Sport-coded stripes.</span>
+      </div>
+      <ul
+        id="demo-acts"
+        class="stack"
+        style="list-style: none; margin: 0; padding: 0; gap: 0; max-height: 480px; overflow-y: auto;"
+      ></ul>
+    </section>
+
+    <section
+      class="panel"
+      style="background: var(--ink-900); color: var(--ink-0); border-color: var(--ink-800); text-align: center;"
+    >
+      <div class="panel-body stack" style="gap: 16px; padding: 40px 24px;">
+        <h2 class="h2" style="color: var(--ink-0); margin: 0;">Want this for your training?</h2>
+        <p class="body" style="color: var(--ink-200); max-width: 56ch; margin: 0 auto;">
+          Connect Strava or Garmin and pacelore renders the same view from your activities, free
+          forever.
+        </p>
+        <div class="row" style="gap: 12px; justify-content: center; flex-wrap: wrap;">
+          <a class="btn btn-primary btn-lg" href="/register">Create account</a>
+          <a class="btn btn-ghost btn-lg" style="color: var(--ink-0); border-color: var(--ink-700);" href="/"
+            >Back to home →</a
+          >
+        </div>
+      </div>
+    </section>
+  </div>
+</Marketing>
+
+<script define:vars={{ FIXTURE: DEMO }}>
+  window.__DEMO__ = FIXTURE;
+</script>
+
+<script>
+  import uPlot from 'uplot';
+  import 'uplot/dist/uPlot.min.css';
+
+  type DemoFixture = {
+    athlete: { handle: string; displayName: string };
+    pmc: { date: string; tss: number; ctl: number; atl: number; tsb: number }[];
+    activities: {
+      id: string;
+      date: string;
+      sport: 'cycling' | 'running' | 'swimming';
+      name: string;
+      durationSec: number;
+      distanceM: number;
+      hrAvg?: number;
+      powerAvg?: number;
+      np?: number;
+      tss: number;
+      ascentM?: number;
+      source: 'strava' | 'garmin';
+    }[];
+  };
+
+  const fx = (window as unknown as { __DEMO__: DemoFixture }).__DEMO__;
+
+  function axisColors() {
+    const dark =
+      document.documentElement.dataset.theme === 'dark' ||
+      document.documentElement.classList.contains('dark') ||
+      (document.documentElement.dataset.theme !== 'light' &&
+        window.matchMedia('(prefers-color-scheme: dark)').matches);
+    return dark
+      ? { stroke: '#a8a8a3', grid: '#3a3a36', ticks: '#525250' }
+      : { stroke: '#525250', grid: '#e0e0d8', ticks: '#a8a8a3' };
+  }
+  function axisX(): uPlot.Axis {
+    const c = axisColors();
+    return {
+      stroke: c.stroke,
+      grid: { stroke: c.grid, width: 1 },
+      ticks: { stroke: c.ticks, width: 1, size: 6 },
+      font: '13px "Geist Mono", ui-monospace, Menlo, monospace',
+      size: 56,
+      space: 90,
+    };
+  }
+  function axisY(): uPlot.Axis {
+    const c = axisColors();
+    return {
+      stroke: c.stroke,
+      grid: { stroke: c.grid, width: 1 },
+      ticks: { stroke: c.ticks, width: 1, size: 6 },
+      font: '13px "Geist Mono", ui-monospace, Menlo, monospace',
+      size: 60,
+    };
+  }
+
+  const pmcEl = document.getElementById('demo-pmc') as HTMLElement;
+  const tssEl = document.getElementById('demo-tss') as HTMLElement;
+
+  const t = fx.pmc.map((d) => Math.floor(Date.parse(d.date) / 1000));
+  new uPlot(
+    {
+      width: pmcEl.clientWidth || 900,
+      height: 360,
+      cursor: { drag: { x: true, y: false } },
+      scales: { x: { time: true } },
+      axes: [axisX(), axisY()],
+      series: [
+        {},
+        { label: 'CTL', stroke: '#C8FA1F', width: 2 },
+        { label: 'ATL', stroke: 'var(--ink-700)', width: 1.5, dash: [4, 3] },
+        { label: 'TSB', stroke: 'oklch(0.55 0.11 150)', width: 1.25 },
+      ],
+    },
+    [
+      t,
+      fx.pmc.map((d) => d.ctl),
+      fx.pmc.map((d) => d.atl),
+      fx.pmc.map((d) => d.tsb),
+    ],
+    pmcEl,
+  );
+
+  new uPlot(
+    {
+      width: tssEl.clientWidth || 900,
+      height: 240,
+      scales: { x: { time: true } },
+      axes: [axisX(), axisY()],
+      series: [
+        {},
+        {
+          label: 'TSS',
+          stroke: '#C8FA1F',
+          paths: uPlot.paths.bars!({ size: [0.6, 100] }),
+        },
+      ],
+    },
+    [t, fx.pmc.map((d) => d.tss)],
+    tssEl,
+  );
+
+  // Activities list — same card shape as /calendar.
+  const list = document.getElementById('demo-acts')!;
+  const sportBadge = (s: string): string =>
+    s === 'cycling' ? '🚴' : s === 'running' ? '🏃' : '🏊';
+  const sourceLabel = (s: string) => (s === 'strava' ? 'Strava' : 'Garmin Connect');
+  const fmtHm = (sec: number) => {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    return h ? `${h}h${String(m).padStart(2, '0')}` : `${m}m`;
+  };
+
+  list.innerHTML = fx.activities
+    .slice()
+    .reverse()
+    .slice(0, 30)
+    .map((a) => {
+      const dist = a.distanceM ? `${(a.distanceM / 1000).toFixed(1)} km` : '';
+      const stats: string[] = [];
+      if (a.hrAvg != null) stats.push(`<span><span class="k" data-metric="rhr" tabindex="0">HR</span> ${a.hrAvg}</span>`);
+      if (a.np != null) stats.push(`<span><span class="k" data-metric="np" tabindex="0">NP</span> ${a.np}w</span>`);
+      else if (a.powerAvg != null) stats.push(`<span><span class="k">P</span> ${a.powerAvg}w</span>`);
+      stats.push(`<span><span class="k" data-metric="tss" tabindex="0">TSS</span> ${a.tss}</span>`);
+      if (a.ascentM != null && a.ascentM > 0)
+        stats.push(`<span><span class="k" data-metric="ascent" tabindex="0">↑</span> ${a.ascentM}m</span>`);
+
+      return `
+        <li style="border-bottom: 1px solid var(--border); padding: 14px 20px; display: grid; grid-template-columns: 28px 1.5fr 1fr 1fr auto; gap: 12px; align-items: center;">
+          <span aria-hidden="true">${sportBadge(a.sport)}</span>
+          <div>
+            <div style="font-size: 14px; font-weight: 600;">${escape(a.name)}</div>
+            <div class="caption" style="margin-top: 2px; font-family: var(--font-mono);">
+              ${escape(a.date)} · ${escape(sourceLabel(a.source))}
+            </div>
+          </div>
+          <span class="metric-sm">${escape(fmtHm(a.durationSec))} · ${escape(dist)}</span>
+          <div class="row" style="gap: 12px; flex-wrap: wrap; font-family: var(--font-mono); font-size: 12px;">${stats.join('')}</div>
+          <span class="caption" style="font-family: var(--font-mono);">demo</span>
+        </li>
+      `;
+    })
+    .join('');
+
+  function escape(s: string): string {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+</script>

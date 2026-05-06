@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" role="img" aria-label="pacelore — free Strava and TrainingPeaks alternative">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0E1012"/>
+      <stop offset="100%" stop-color="#1A1C1F"/>
+    </linearGradient>
+    <linearGradient id="tsbFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#9be9a8" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#9be9a8" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- top mark + wordmark -->
+  <g transform="translate(72, 64)" fill="none">
+    <g stroke="#FAFAF7" stroke-linecap="round" opacity="0.45">
+      <line x1="32" y1="3" x2="32" y2="7" stroke-width="1.5"/>
+      <line x1="32" y1="57" x2="32" y2="61" stroke-width="1.5"/>
+      <line x1="3" y1="32" x2="7" y2="32" stroke-width="1.5"/>
+      <line x1="57" y1="32" x2="61" y2="32" stroke-width="1.5"/>
+    </g>
+    <path d="M 14 50 Q 14 18 38 18 Q 52 18 52 30 Q 52 40 40 40 L 26 40" stroke="#FAFAF7" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 26 40 L 44 52" stroke="#C8FA1F" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="44" cy="52" r="3.5" fill="#C8FA1F"/>
+    <circle cx="14" cy="50" r="3" fill="#FAFAF7"/>
+    <text x="80" y="42" font-family="Geist, Inter, system-ui, sans-serif" font-size="30" font-weight="600" letter-spacing="-0.02em" fill="#FAFAF7">pacelore</text>
+  </g>
+
+  <!-- hero copy -->
+  <g font-family="Inter, system-ui, sans-serif" fill="#FAFAF7">
+    <text x="72" y="240" font-size="64" font-weight="600" letter-spacing="-2">Strava analytics.</text>
+    <text x="72" y="320" font-size="64" font-weight="600" letter-spacing="-2">TrainingPeaks PMC.</text>
+    <text x="72" y="400" font-size="64" font-weight="600" letter-spacing="-2" fill="#C8FA1F">Free.</text>
+
+    <text x="72" y="460" font-family="Geist Mono, ui-monospace, monospace" font-size="20" letter-spacing="0.03em" fill="#A4A4A0">
+      TSS · NP · IF · GAP · CTL · ATL · TSB
+    </text>
+    <text x="72" y="492" font-family="Geist Mono, ui-monospace, monospace" font-size="16" letter-spacing="0.03em" fill="#7A7A78">
+      Source-available · runs on Cloudflare · pacelore.com
+    </text>
+  </g>
+
+  <!-- mini chart on the right -->
+  <g transform="translate(680, 180)">
+    <rect width="448" height="320" rx="14" fill="#16181B" stroke="#2A2D31"/>
+    <text x="24" y="36" font-family="Geist Mono, ui-monospace, monospace" font-size="11" letter-spacing="2" fill="#7A7A78">PMC · 90 DAYS</text>
+
+    <!-- gridlines -->
+    <g stroke="#2A2D31" stroke-dasharray="2 4">
+      <line x1="24" x2="424" y1="80" y2="80"/>
+      <line x1="24" x2="424" y1="140" y2="140"/>
+      <line x1="24" x2="424" y1="200" y2="200"/>
+      <line x1="24" x2="424" y1="260" y2="260"/>
+    </g>
+
+    <!-- TSB shaded -->
+    <path d="M24 240 L84 230 L144 220 L204 215 L264 200 L324 185 L384 170 L424 165 L424 280 L24 280 Z" fill="url(#tsbFill)"/>
+
+    <!-- ATL dashed -->
+    <path d="M24 200 L84 175 L144 150 L204 125 L264 110 L324 90 L384 75 L424 70" stroke="#A4A4A0" stroke-width="1.5" stroke-dasharray="6 4" fill="none"/>
+
+    <!-- CTL solid volt -->
+    <path d="M24 215 L84 195 L144 175 L204 155 L264 135 L324 115 L384 100 L424 85" stroke="#C8FA1F" stroke-width="3" fill="none"/>
+    <g fill="#C8FA1F">
+      <circle cx="24" cy="215" r="3"/>
+      <circle cx="424" cy="85" r="4"/>
+    </g>
+
+    <!-- legend -->
+    <g font-family="Geist Mono, ui-monospace, monospace" font-size="13" fill="#A4A4A0" transform="translate(24, 300)">
+      <rect width="14" height="2" y="6" fill="#C8FA1F"/>
+      <text x="22" y="12" fill="#FAFAF7">CTL 76</text>
+      <rect width="14" y="6" height="2" fill="#A4A4A0" opacity="0.6" x="100"/>
+      <text x="120" y="12">ATL 84</text>
+      <rect x="200" y="3" width="14" height="10" fill="#9be9a8" opacity="0.18"/>
+      <text x="220" y="12">TSB −7.9</text>
+    </g>
+  </g>
+</svg>
