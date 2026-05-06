@@ -44,11 +44,12 @@ export interface CredentialRow {
   public_key: ArrayBuffer;
   counter: number;
   transports: string | null;
+  rp_id?: string | null;
 }
 
 export async function listCredentialsForUser(env: Env, userId: string): Promise<CredentialRow[]> {
   const result = await env.DB.prepare(
-    'SELECT id, user_id, public_key, counter, transports FROM webauthn_credentials WHERE user_id = ?',
+    'SELECT id, user_id, public_key, counter, transports, rp_id FROM webauthn_credentials WHERE user_id = ?',
   )
     .bind(userId)
     .all<CredentialRow>();
@@ -76,11 +77,12 @@ export async function insertCredential(
     counter: number;
     transports?: string[];
     deviceName?: string;
+    rpId?: string;
   },
 ): Promise<void> {
   await env.DB.prepare(
-    `INSERT INTO webauthn_credentials (id, user_id, public_key, counter, transports, device_name)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO webauthn_credentials (id, user_id, public_key, counter, transports, device_name, rp_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       cred.id,
@@ -89,6 +91,7 @@ export async function insertCredential(
       cred.counter,
       cred.transports ? JSON.stringify(cred.transports) : null,
       cred.deviceName ?? null,
+      cred.rpId ?? null,
     )
     .run();
 }

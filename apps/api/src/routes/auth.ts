@@ -112,6 +112,7 @@ authRoutes.post('/auth/register/verify', async (c) => {
     userId: pending.id,
     publicKey: verified.publicKey,
     counter: verified.counter,
+    rpId: rp.rpId,
     ...(verified.transports ? { transports: verified.transports as string[] } : {}),
     ...(body.deviceName ? { deviceName: body.deviceName } : {}),
   });
@@ -166,6 +167,7 @@ authRoutes.post('/auth/login/options', async (c) => {
   // can't probe whether the account exists from this endpoint.
   let allowCredentialIds: string[] = [];
   let userId: string | undefined;
+  let rpMismatch: { storedRpId: string; currentRpId: string } | undefined;
   const email = normalizeEmail(body.email);
   if (email && isValidEmail(email)) {
     const user = await findUserByEmail(c.env, email);
@@ -173,10 +175,20 @@ authRoutes.post('/auth/login/options', async (c) => {
       userId = user.id;
       const creds = await listCredentialsForUser(c.env, user.id);
       allowCredentialIds = creds.map((cr) => cr.id);
+      // If every credential was minted under a different rpId, the
+      // browser/password manager won't surface any passkey for this
+      // login. Surface that explicitly so the front-end can tell the
+      // athlete instead of leaving them at a frozen prompt.
+      const rpIds = (creds as Array<{ rp_id?: string | null }>)
+        .map((cr) => cr.rp_id)
+        .filter((x): x is string => Boolean(x));
+      if (rpIds.length > 0 && !rpIds.some((id) => id === rp.rpId)) {
+        rpMismatch = { storedRpId: rpIds[0]!, currentRpId: rp.rpId };
+      }
     }
   }
   const { challengeId, options } = await startAuthentication(c.env, rp, allowCredentialIds, userId);
-  return c.json({ challengeId, options });
+  return c.json({ challengeId, options, ...(rpMismatch ? { rpMismatch } : {}) });
 });
 
 authRoutes.post('/auth/login/verify', async (c) => {

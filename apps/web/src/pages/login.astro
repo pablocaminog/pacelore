@@ -65,7 +65,17 @@ import Wordmark from '../components/Wordmark.astro';
         throw new Error(
           (await optionsRes.json().catch(() => ({ error: optionsRes.statusText }))).error,
         );
-      const { challengeId, options } = await optionsRes.json();
+      const optionsBody = (await optionsRes.json()) as {
+        challengeId: string;
+        options: { challenge: string };
+        rpMismatch?: { storedRpId: string; currentRpId: string };
+      };
+      if (optionsBody.rpMismatch) {
+        throw new Error(
+          `Your passkey was registered under "${optionsBody.rpMismatch.storedRpId}" — this site is now "${optionsBody.rpMismatch.currentRpId}". Register a new passkey for this domain (Settings → security) or contact support to migrate.`,
+        );
+      }
+      const { challengeId, options } = optionsBody;
 
       const assertion = await startAuthentication({ optionsJSON: options });
 
