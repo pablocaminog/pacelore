@@ -444,20 +444,15 @@ trainingRoutes.get('/me/ftp-estimates', async (c) => {
 
   const runRow = await c.env.DB.prepare(
     `SELECT value FROM personal_records
-      WHERE athlete_id = ? AND sport = 'running' AND key = 'distance:30m'
-      LIMIT 1`,
-  ).bind(session.userId).first<{ value: number }>();
-
-  const swimRow = await c.env.DB.prepare(
-    `SELECT value FROM personal_records
-      WHERE athlete_id = ? AND sport = 'swimming' AND key = 'distance:400m'
+      WHERE athlete_id = ? AND sport = 'running' AND key = 'distance:5000m'
       LIMIT 1`,
   ).bind(session.userId).first<{ value: number }>();
 
   return c.json({
-    ftpW:         bikeRow ? Math.round(bikeRow.value * 0.95) : null,
-    ftpRunPaceSec: runRow  ? Math.round(1800 / (runRow.value / 1000)) : null,
-    ftpSwimCssSec: swimRow ? Math.round(swimRow.value / 4) : null,
+    ftpW:          bikeRow ? Math.round(bikeRow.value * 0.95) : null,
+    // 5km race time → sec/km → ×1.05 for threshold estimate
+    ftpRunPaceSec: runRow  ? Math.round((runRow.value / 5000) * 1000 * 1.05) : null,
+    ftpSwimCssSec: null, // swim PRs not computed by pipeline
   });
 });
 
@@ -487,8 +482,12 @@ trainingRoutes.post('/plans', async (c) => {
     throw new HTTPException(400, { message: 'raceDateTs and grid required' });
   }
 
-  const template = TEMPLATES[body.raceType];
   const todayTs = Math.floor(Date.now() / 1000);
+  if (body.raceDateTs <= todayTs) {
+    throw new HTTPException(400, { message: 'raceDateTs must be in the future' });
+  }
+
+  const template = TEMPLATES[body.raceType];
 
   const spec = {
     raceType: body.raceType,
@@ -522,8 +521,14 @@ trainingRoutes.post('/plans', async (c) => {
      VALUES (?, ?, ?, ?, ?, unixepoch())`,
   ).bind(planId, session.userId, body.raceType, body.raceDateTs, configJson).run();
 
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
+  // Anchor plan to race date: week N's Monday = Monday of race week,
+  // week N-1 = 7 days earlier, etc.
+  const raceDateObj = new Date(body.raceDateTs * 1000);
+  const raceDow = (raceDateObj.getDay() + 6) % 7; // 0=Mon
+  const raceWeekMonday = new Date(raceDateObj);
+  raceWeekMonday.setDate(raceDateObj.getDate() - raceDow);
+  raceWeekMonday.setHours(0, 0, 0, 0);
+
   const weekRows: { weekNum: number; phase: string; tss: number; hours: number; sessions: object[] }[] = [];
   const stmts: ReturnType<D1Database['prepare']>[] = [];
 
@@ -531,12 +536,8 @@ trainingRoutes.post('/plans', async (c) => {
     const brickAllowed = template.brickPhases.includes(week.phase as any);
     const sessions = scheduleWeek(week, body.grid, brickAllowed);
 
-    const weekStart = new Date(startOfToday);
-    weekStart.setDate(weekStart.getDate() + (week.weekNum - 1) * 7);
-    // Align to Monday
-    const dow = weekStart.getDay(); // 0=Sun
-    const toMonday = dow === 1 ? 0 : dow === 0 ? 1 : 8 - dow;
-    weekStart.setDate(weekStart.getDate() + toMonday);
+    const weekStart = new Date(raceWeekMonday);
+    weekStart.setDate(raceWeekMonday.getDate() - (weekPlans.length - week.weekNum) * 7);
 
     const sessionRows: object[] = [];
     for (const s of sessions) {
