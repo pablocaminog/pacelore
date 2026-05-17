@@ -13,6 +13,7 @@
   "dependencies": {
     "@pacelore/fit-parser": "workspace:*",
     "@pacelore/metrics": "workspace:*",
+    "@pacelore/planner": "workspace:*",
     "@pacelore/segments": "workspace:*",
     "@simplewebauthn/server": "11.0.0",
     "@simplewebauthn/types": "11.0.0",

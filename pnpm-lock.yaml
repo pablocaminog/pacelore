@@ -35,6 +35,9 @@ importers:
       '@pacelore/metrics':
         specifier: workspace:*
         version: link:../../packages/metrics
+      '@pacelore/planner':
+        specifier: workspace:*
+        version: link:../../packages/planner
       '@pacelore/segments':
         specifier: workspace:*
         version: link:../../packages/segments
@@ -115,6 +118,12 @@ importers:
         version: 2.1.5(@types/node@25.6.0)
 
   packages/metrics:
+    devDependencies:
+      vitest:
+        specifier: 2.1.5
+        version: 2.1.5(@types/node@25.6.0)
+
+  packages/planner:
     devDependencies:
       vitest:
         specifier: 2.1.5

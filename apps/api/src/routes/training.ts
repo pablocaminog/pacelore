@@ -26,6 +26,8 @@ import type { Env } from '../env.js';
 import { requireSession, type AuthVariables } from '../middleware/auth.js';
 import { uuidv7 } from '../util/uuid.js';
 import { workoutToFit, workoutToZwo, type Workout } from '../integrations/workout-export.js';
+import type { RaceType, ScheduleGrid } from '@pacelore/planner';
+import { buildWeekPlans, scheduleWeek, auditPlan, TEMPLATES } from '@pacelore/planner';
 
 export const trainingRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 trainingRoutes.use('*', requireSession());
@@ -429,3 +431,234 @@ function targetIntensity(step: Workout['steps'][number]): number | null {
   }
   return null;
 }
+
+// FTP estimates -------------------------------------------------------
+trainingRoutes.get('/me/ftp-estimates', async (c) => {
+  const session = c.get('session');
+
+  const bikeRow = await c.env.DB.prepare(
+    `SELECT value FROM personal_records
+      WHERE athlete_id = ? AND sport = 'cycling' AND key = 'power:1200s'
+      LIMIT 1`,
+  ).bind(session.userId).first<{ value: number }>();
+
+  const runRow = await c.env.DB.prepare(
+    `SELECT value FROM personal_records
+      WHERE athlete_id = ? AND sport = 'running' AND key = 'distance:30m'
+      LIMIT 1`,
+  ).bind(session.userId).first<{ value: number }>();
+
+  const swimRow = await c.env.DB.prepare(
+    `SELECT value FROM personal_records
+      WHERE athlete_id = ? AND sport = 'swimming' AND key = 'distance:400m'
+      LIMIT 1`,
+  ).bind(session.userId).first<{ value: number }>();
+
+  return c.json({
+    ftpW:         bikeRow ? Math.round(bikeRow.value * 0.95) : null,
+    ftpRunPaceSec: runRow  ? Math.round(1800 / (runRow.value / 1000)) : null,
+    ftpSwimCssSec: swimRow ? Math.round(swimRow.value / 4) : null,
+  });
+});
+
+// Race plans ----------------------------------------------------------
+const VALID_RACE_TYPES = new Set<RaceType>(['sprint', 'olympic', '703', 'full', 'half-marathon']);
+
+interface PlanBody {
+  raceType: RaceType;
+  raceDateTs: number;
+  ctlBaseline: number;
+  ftpW: number;
+  ftpRunPaceSec: number;
+  ftpSwimCssSec: number;
+  heightCm?: number;
+  weightKg?: number;
+  grid: ScheduleGrid;
+}
+
+trainingRoutes.post('/plans', async (c) => {
+  const session = c.get('session');
+  const body = (await c.req.json()) as PlanBody;
+
+  if (!body.raceType || !VALID_RACE_TYPES.has(body.raceType)) {
+    throw new HTTPException(400, { message: 'invalid raceType' });
+  }
+  if (!body.raceDateTs || !body.grid) {
+    throw new HTTPException(400, { message: 'raceDateTs and grid required' });
+  }
+
+  const template = TEMPLATES[body.raceType];
+  const todayTs = Math.floor(Date.now() / 1000);
+
+  const spec = {
+    raceType: body.raceType,
+    raceDateTs: body.raceDateTs,
+    todayTs,
+    ctlBaseline: body.ctlBaseline ?? 40,
+    ftpW: body.ftpW || Math.round((body.ctlBaseline ?? 40) * 2.5),
+    ftpRunPaceSec: body.ftpRunPaceSec ?? 0,
+    ftpSwimCssSec: body.ftpSwimCssSec ?? 0,
+    grid: body.grid,
+  };
+
+  const weekPlans = buildWeekPlans(spec, template);
+
+  if (body.heightCm || body.weightKg) {
+    await c.env.DB.prepare(
+      `UPDATE users SET height_cm = COALESCE(?, height_cm), weight_kg = COALESCE(?, weight_kg) WHERE id = ?`,
+    ).bind(body.heightCm ?? null, body.weightKg ?? null, session.userId).run();
+  }
+
+  const planId = uuidv7();
+  const configJson = JSON.stringify({
+    ftpW: spec.ftpW,
+    ftpRunPaceSec: spec.ftpRunPaceSec,
+    ftpSwimCssSec: spec.ftpSwimCssSec,
+    grid: body.grid,
+  });
+
+  await c.env.DB.prepare(
+    `INSERT INTO race_plans (id, athlete_id, race_type, race_date, config_json, created_at)
+     VALUES (?, ?, ?, ?, ?, unixepoch())`,
+  ).bind(planId, session.userId, body.raceType, body.raceDateTs, configJson).run();
+
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const weekRows: { weekNum: number; phase: string; tss: number; hours: number; sessions: object[] }[] = [];
+  const stmts: ReturnType<D1Database['prepare']>[] = [];
+
+  for (const week of weekPlans) {
+    const brickAllowed = template.brickPhases.includes(week.phase as any);
+    const sessions = scheduleWeek(week, body.grid, brickAllowed);
+
+    const weekStart = new Date(startOfToday);
+    weekStart.setDate(weekStart.getDate() + (week.weekNum - 1) * 7);
+    // Align to Monday
+    const dow = weekStart.getDay(); // 0=Sun
+    const toMonday = dow === 1 ? 0 : dow === 0 ? 1 : 8 - dow;
+    weekStart.setDate(weekStart.getDate() + toMonday);
+
+    const sessionRows: object[] = [];
+    for (const s of sessions) {
+      const sessionDate = new Date(weekStart);
+      sessionDate.setDate(weekStart.getDate() + s.day);
+      const dateStr = sessionDate.toISOString().slice(0, 10);
+      const pwId = uuidv7();
+      const sessionJson = JSON.stringify({
+        sport: s.sport,
+        durationMin: s.durationMin,
+        zone: s.zone,
+        phase: s.phase,
+        description: s.description,
+        ...(s.windowStart ? { windowStart: s.windowStart, windowEnd: s.windowEnd } : {}),
+      });
+
+      stmts.push(
+        c.env.DB.prepare(
+          `INSERT INTO planned_workouts (id, athlete_id, scheduled_date, plan_id, session_json, created_at)
+           VALUES (?, ?, ?, ?, ?, unixepoch())`,
+        ).bind(pwId, session.userId, dateStr, planId, sessionJson),
+      );
+
+      sessionRows.push({ plannedWorkoutId: pwId, day: s.day, sport: s.sport, durationMin: s.durationMin, zone: s.zone, description: s.description });
+    }
+
+    const totalHours = sessions.reduce((acc, s) => acc + s.durationMin / 60, 0);
+    weekRows.push({ weekNum: week.weekNum, phase: week.phase, tss: week.tss, hours: Math.round(totalHours * 10) / 10, sessions: sessionRows });
+  }
+
+  if (stmts.length > 0) {
+    await c.env.DB.batch(stmts);
+  }
+
+  let audit = null;
+  if (c.env.ANTHROPIC_API_KEY) {
+    try {
+      audit = await auditPlan(weekPlans, spec, c.env.ANTHROPIC_API_KEY);
+      await c.env.DB.prepare(
+        `UPDATE race_plans SET audit_json = ? WHERE id = ?`,
+      ).bind(JSON.stringify(audit), planId).run();
+    } catch {
+      // audit failure is non-fatal
+    }
+  }
+
+  return c.json({ planId, raceType: body.raceType, raceDateTs: body.raceDateTs, weeks: weekRows, audit }, 201);
+});
+
+trainingRoutes.get('/plans', async (c) => {
+  const session = c.get('session');
+  const rows = await c.env.DB.prepare(
+    `SELECT id, race_type AS raceType, race_date AS raceDateTs,
+            status, created_at AS createdAt,
+            (SELECT COUNT(*) FROM planned_workouts WHERE plan_id = race_plans.id) AS sessionCount
+       FROM race_plans WHERE athlete_id = ?
+      ORDER BY created_at DESC`,
+  ).bind(session.userId).all();
+  return c.json({ items: rows.results ?? [] });
+});
+
+trainingRoutes.get('/plans/:planId', async (c) => {
+  const session = c.get('session');
+  const planId = c.req.param('planId');
+
+  const plan = await c.env.DB.prepare(
+    `SELECT id, race_type AS raceType, race_date AS raceDateTs,
+            audit_json AS auditJson, status, created_at AS createdAt
+       FROM race_plans WHERE id = ? AND athlete_id = ?`,
+  ).bind(planId, session.userId).first<{
+    id: string; raceType: string; raceDateTs: number;
+    auditJson: string | null; status: string; createdAt: number;
+  }>();
+
+  if (!plan) throw new HTTPException(404, { message: 'plan not found' });
+
+  const sessions = await c.env.DB.prepare(
+    `SELECT id, scheduled_date AS date, session_json AS sessionJson
+       FROM planned_workouts
+      WHERE plan_id = ? AND athlete_id = ?
+      ORDER BY scheduled_date ASC`,
+  ).bind(planId, session.userId).all();
+
+  return c.json({
+    ...plan,
+    audit: plan.auditJson ? JSON.parse(plan.auditJson) : null,
+    sessions: (sessions.results ?? []).map((r: any) => ({
+      id: r.id,
+      date: r.date,
+      ...(r.sessionJson ? JSON.parse(r.sessionJson as string) : {}),
+    })),
+  });
+});
+
+trainingRoutes.delete('/plans/:planId', async (c) => {
+  const session = c.get('session');
+  const planId = c.req.param('planId');
+
+  const plan = await c.env.DB.prepare(
+    `SELECT id FROM race_plans WHERE id = ? AND athlete_id = ?`,
+  ).bind(planId, session.userId).first();
+
+  if (!plan) throw new HTTPException(404, { message: 'plan not found' });
+
+  await c.env.DB.prepare(`DELETE FROM race_plans WHERE id = ?`).bind(planId).run();
+
+  return c.json({ deleted: true });
+});
+
+trainingRoutes.patch('/plans/:planId/archive', async (c) => {
+  const session = c.get('session');
+  const planId = c.req.param('planId');
+
+  const plan = await c.env.DB.prepare(
+    `SELECT id FROM race_plans WHERE id = ? AND athlete_id = ?`,
+  ).bind(planId, session.userId).first();
+
+  if (!plan) throw new HTTPException(404, { message: 'plan not found' });
+
+  await c.env.DB.prepare(
+    `UPDATE race_plans SET status = 'archived' WHERE id = ?`,
+  ).bind(planId).run();
+
+  return c.json({ archived: true });
+});
