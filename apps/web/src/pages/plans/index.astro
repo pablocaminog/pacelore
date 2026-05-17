@@ -1,0 +1,80 @@
+---
+import Shell from '../../layouts/Shell.astro';
+---
+
+<Shell title="Training Plans" active="plans">
+  <div class="stack" style="gap: 24px;">
+    <header class="row">
+      <div>
+        <h1 class="h1" style="font-size: 28px;">Training Plans</h1>
+        <p class="muted body-sm" style="margin-top: 4px;">Periodized plans for your target race.</p>
+      </div>
+      <a href="/plans/new" class="btn btn-primary row-end" style="text-decoration:none;">New Plan</a>
+    </header>
+
+    <div id="plans-list" class="stack" style="gap: 12px;">
+      <p class="muted body-sm">Loading…</p>
+    </div>
+
+    <details id="archived-section" style="display:none;">
+      <summary class="muted body-sm" style="cursor:pointer;user-select:none;">Archived plans</summary>
+      <div id="archived-list" class="stack" style="gap: 8px; margin-top: 12px;"></div>
+    </details>
+  </div>
+</Shell>
+
+<script>
+const RACE_LABELS: Record<string, string> = {
+  sprint: 'Sprint Triathlon',
+  olympic: 'Olympic Triathlon',
+  '703': 'Ironman 70.3',
+  full: 'Full Ironman',
+  'half-marathon': 'Half Marathon',
+};
+
+function daysUntil(ts: number) {
+  return Math.ceil((ts - Date.now() / 1000) / 86400);
+}
+
+function renderCard(p: any) {
+  const days = daysUntil(p.raceDateTs);
+  const label = RACE_LABELS[p.raceType] ?? p.raceType;
+  const raceDate = new Date(p.raceDateTs * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return `
+    <a href="/plans/${p.id}" class="panel" style="text-decoration:none;display:block;">
+      <div class="panel-body row" style="gap:16px;align-items:center;">
+        <div class="stack" style="gap:4px;flex:1;">
+          <span class="h3" style="font-size:16px;">${label}</span>
+          <span class="muted body-sm">${raceDate} · ${p.sessionCount} sessions</span>
+        </div>
+        <span class="metric-label" style="color:${days < 0 ? 'var(--fg-muted)' : days < 14 ? 'var(--warning)' : 'inherit'};">
+          ${days < 0 ? 'Past' : days === 0 ? 'Today!' : `${days}d away`}
+        </span>
+      </div>
+    </a>`;
+}
+
+async function load() {
+  const res = await fetch('/api/v1/plans');
+  if (!res.ok) return;
+  const { items } = await res.json() as { items: any[] };
+
+  const active = items.filter((p: any) => p.status === 'active');
+  const archived = items.filter((p: any) => p.status === 'archived');
+
+  const list = document.getElementById('plans-list')!;
+  if (active.length === 0) {
+    list.innerHTML = '<p class="muted body-sm">No plans yet. <a href="/plans/new">Create one →</a></p>';
+  } else {
+    list.innerHTML = active.map(renderCard).join('');
+  }
+
+  if (archived.length > 0) {
+    const section = document.getElementById('archived-section')!;
+    section.style.display = '';
+    document.getElementById('archived-list')!.innerHTML = archived.map(renderCard).join('');
+  }
+}
+
+load();
+</script>

@@ -1,0 +1,171 @@
+---
+import Shell from '../../layouts/Shell.astro';
+const { id } = Astro.params;
+---
+
+<Shell title="Plan Detail" active="plans">
+  <div class="stack" style="gap: 24px; max-width: 720px;">
+    <div id="plan-loading" class="muted body-sm">Loading…</div>
+    <div id="plan-content" style="display:none;" class="stack" style="gap:24px;">
+
+      <header class="row" style="flex-wrap:wrap;gap:12px;">
+        <div class="stack" style="gap:4px;flex:1;">
+          <h1 class="h1" id="plan-title" style="font-size:28px;"></h1>
+          <p class="muted body-sm" id="plan-meta"></p>
+        </div>
+        <div class="row" style="gap:8px;">
+          <button class="btn" id="archive-btn">Archive</button>
+          <button class="btn" id="delete-btn" style="color:var(--danger,#f87171);">Delete</button>
+        </div>
+      </header>
+
+      <div id="audit-block" style="display:none;" class="panel">
+        <div class="panel-body stack" style="gap:8px;">
+          <p class="body-sm" id="audit-summary"></p>
+          <div id="audit-warnings" class="stack" style="gap:6px;"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="row" style="gap:12px;align-items:center;margin-bottom:16px;">
+          <button class="btn" id="prev-week" disabled>‹ Prev</button>
+          <span id="week-label" class="label" style="flex:1;text-align:center;"></span>
+          <button class="btn" id="next-week">Next ›</button>
+        </div>
+        <div id="week-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;"></div>
+      </div>
+
+      <a href="/calendar" class="btn" style="text-align:center;text-decoration:none;">View in Calendar →</a>
+    </div>
+  </div>
+</Shell>
+
+<style>
+.session-cell {
+  border-radius: 6px; padding: 8px 4px; text-align: center; min-height: 60px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-size: 11px; gap: 2px;
+}
+.session-cell.empty { background: var(--surface); border: 1px dashed var(--border); color: var(--fg-muted); }
+.session-cell.swim { background: var(--pace-900, #1e1b4b); border: 1px solid var(--pace-500); }
+.session-cell.bike { background: oklch(0.26 0.10 50); border: 1px solid oklch(0.55 0.18 50); }
+.session-cell.run { background: oklch(0.20 0.12 140); border: 1px solid oklch(0.50 0.18 140); }
+</style>
+
+<script define:vars={{ planId: id }}>
+const RACE_LABELS = {
+  sprint: 'Sprint Triathlon', olympic: 'Olympic Triathlon',
+  '703': 'Ironman 70.3', full: 'Full Ironman', 'half-marathon': 'Half Marathon',
+};
+const SPORT_EMOJI = { swim: '🏊', bike: '🚴', run: '🏃' };
+const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+let plan = null;
+let allWeeks = [];
+let currentWeek = 0;
+
+function dayOfDateStr(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  return (d.getDay() + 6) % 7; // 0=Mon
+}
+
+async function load() {
+  const res = await fetch(`/api/v1/plans/${planId}`);
+  if (!res.ok) { document.getElementById('plan-loading').textContent = 'Plan not found.'; return; }
+  plan = await res.json();
+  document.getElementById('plan-loading').style.display = 'none';
+  document.getElementById('plan-content').style.display = '';
+
+  const sessionsByDate = {};
+  for (const s of plan.sessions ?? []) {
+    if (!sessionsByDate[s.date]) sessionsByDate[s.date] = [];
+    sessionsByDate[s.date].push(s);
+  }
+
+  const dates = Object.keys(sessionsByDate).sort();
+  if (dates.length > 0) {
+    const firstDate = new Date(dates[0] + 'T12:00:00');
+    const dow = (firstDate.getDay() + 6) % 7;
+    firstDate.setDate(firstDate.getDate() - dow);
+    const lastDate = new Date(dates[dates.length - 1] + 'T12:00:00');
+    const totalWeeks = Math.ceil((lastDate - firstDate) / (7 * 86400_000)) + 1;
+    for (let w = 0; w < totalWeeks; w++) {
+      const weekStart = new Date(firstDate);
+      weekStart.setDate(firstDate.getDate() + w * 7);
+      const weekEnd = new Date(weekStart.getTime() + 7 * 86400_000);
+      const weekSessions = [];
+      for (const [date, sessions] of Object.entries(sessionsByDate)) {
+        const d = new Date(date + 'T12:00:00');
+        if (d >= weekStart && d < weekEnd) {
+          for (const s of sessions) weekSessions.push({ ...s, day: dayOfDateStr(date) });
+        }
+      }
+      allWeeks.push({ weekNum: w + 1, sessions: weekSessions });
+    }
+  }
+
+  const RACE_LABEL = RACE_LABELS[plan.raceType] ?? plan.raceType;
+  document.getElementById('plan-title').textContent = RACE_LABEL;
+  const raceDate = new Date(plan.raceDateTs * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const daysLeft = Math.ceil((plan.raceDateTs - Date.now() / 1000) / 86400);
+  document.getElementById('plan-meta').textContent = `${raceDate} · ${daysLeft > 0 ? daysLeft + ' days away' : 'Past'} · ${allWeeks.length} weeks`;
+
+  if (plan.audit) {
+    document.getElementById('audit-block').style.display = '';
+    document.getElementById('audit-summary').textContent = plan.audit.summary;
+    document.getElementById('audit-warnings').innerHTML = (plan.audit.warnings ?? []).map(w =>
+      `<div style="padding:8px 12px;border-radius:6px;background:${w.severity==='error'?'oklch(0.2 0.08 25)':'oklch(0.25 0.10 60)'};color:${w.severity==='error'?'#f87171':'oklch(0.85 0.18 60)'};" class="body-sm">${w.severity==='error'?'⛔':'⚠️'} ${w.message}</div>`
+    ).join('');
+  }
+
+  renderWeek();
+}
+
+function renderWeek() {
+  if (allWeeks.length === 0) return;
+  const week = allWeeks[currentWeek];
+  document.getElementById('week-label').textContent = `Week ${week.weekNum} of ${allWeeks.length}`;
+  document.getElementById('prev-week').disabled = currentWeek === 0;
+  document.getElementById('next-week').disabled = currentWeek === allWeeks.length - 1;
+
+  const byDay = {};
+  for (const s of week.sessions) { if (!byDay[s.day]) byDay[s.day] = []; byDay[s.day].push(s); }
+
+  const grid = document.getElementById('week-grid');
+  grid.innerHTML = '';
+  for (let d = 0; d < 7; d++) {
+    const div = document.createElement('div');
+    div.className = 'stack'; div.style.gap = '4px';
+    const lbl = document.createElement('div');
+    lbl.className = 'muted body-sm'; lbl.style.cssText = 'text-align:center;font-size:10px;';
+    lbl.textContent = DAY_NAMES[d]; div.appendChild(lbl);
+    const sessions = byDay[d] ?? [];
+    if (sessions.length === 0) {
+      const cell = document.createElement('div'); cell.className = 'session-cell empty'; cell.textContent = '—'; div.appendChild(cell);
+    } else {
+      for (const s of sessions) {
+        const cell = document.createElement('div'); cell.className = `session-cell ${s.sport ?? ''}`;
+        cell.innerHTML = `<span style="font-size:18px">${SPORT_EMOJI[s.sport]??'🏋️'}</span><span>${s.durationMin}m</span><span style="opacity:.6;font-size:9px">Z${s.zone}</span>`;
+        div.appendChild(cell);
+      }
+    }
+    grid.appendChild(div);
+  }
+}
+
+document.getElementById('prev-week').addEventListener('click', () => { if (currentWeek > 0) { currentWeek--; renderWeek(); } });
+document.getElementById('next-week').addEventListener('click', () => { if (currentWeek < allWeeks.length - 1) { currentWeek++; renderWeek(); } });
+
+document.getElementById('archive-btn').addEventListener('click', async () => {
+  if (!confirm('Archive this plan?')) return;
+  await fetch(`/api/v1/plans/${planId}/archive`, { method: 'PATCH' });
+  window.location.href = '/plans';
+});
+document.getElementById('delete-btn').addEventListener('click', async () => {
+  if (!confirm('Delete this plan and all its scheduled workouts? This cannot be undone.')) return;
+  await fetch(`/api/v1/plans/${planId}`, { method: 'DELETE' });
+  window.location.href = '/plans';
+});
+
+load();
+</script>

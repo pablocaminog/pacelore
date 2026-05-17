@@ -1,0 +1,496 @@
+---
+import Shell from '../../layouts/Shell.astro';
+---
+
+<Shell title="New Training Plan" active="plans">
+  <div class="stack" style="gap: 24px; max-width: 720px;">
+    <header>
+      <h1 class="h1" style="font-size: 28px;">New Training Plan</h1>
+    </header>
+
+    <div class="row" id="step-progress" style="gap: 8px; align-items: center;">
+      <span class="step-dot active" data-step="1">1</span>
+      <span class="step-line"></span>
+      <span class="step-dot" data-step="2">2</span>
+      <span class="step-line"></span>
+      <span class="step-dot" data-step="3">3</span>
+      <span class="step-line"></span>
+      <span class="step-dot" data-step="4">4</span>
+    </div>
+
+    <!-- Step 1: Race -->
+    <div id="step-1" class="stack" style="gap: 20px;">
+      <h2 class="h3">What's your race?</h2>
+      <div class="grid-tiles grid-cols-3" id="race-type-grid">
+        <button class="panel race-btn" data-race="sprint" style="text-align:left;cursor:pointer;background:none;border:2px solid transparent;">
+          <div class="panel-body"><strong>Sprint</strong><br><span class="muted body-sm">750m · 20km · 5km</span></div>
+        </button>
+        <button class="panel race-btn" data-race="olympic" style="text-align:left;cursor:pointer;background:none;border:2px solid transparent;">
+          <div class="panel-body"><strong>Olympic</strong><br><span class="muted body-sm">1.5km · 40km · 10km</span></div>
+        </button>
+        <button class="panel race-btn" data-race="703" style="text-align:left;cursor:pointer;background:none;border:2px solid transparent;">
+          <div class="panel-body"><strong>Ironman 70.3</strong><br><span class="muted body-sm">1.9km · 90km · 21km</span></div>
+        </button>
+        <button class="panel race-btn" data-race="full" style="text-align:left;cursor:pointer;background:none;border:2px solid transparent;">
+          <div class="panel-body"><strong>Full Ironman</strong><br><span class="muted body-sm">3.8km · 180km · 42km</span></div>
+        </button>
+        <button class="panel race-btn" data-race="half-marathon" style="text-align:left;cursor:pointer;background:none;border:2px solid transparent;">
+          <div class="panel-body"><strong>Half Marathon</strong><br><span class="muted body-sm">21.1km run</span></div>
+        </button>
+      </div>
+      <div class="stack" style="gap: 8px;">
+        <label class="label">Race date</label>
+        <input type="date" id="race-date" style="max-width:200px;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:inherit;" />
+        <p id="date-warning" class="body-sm" style="color:var(--warning,#f59e0b);display:none;"></p>
+      </div>
+      <button class="btn btn-primary" id="step1-next" disabled>Next →</button>
+    </div>
+
+    <!-- Step 2: Schedule grid -->
+    <div id="step-2" class="stack" style="gap: 20px; display:none;">
+      <h2 class="h3">When can you train?</h2>
+      <p class="muted body-sm">Click a cell to set intensity. Click an active cell to add a time window.</p>
+      <div style="overflow-x:auto;">
+        <table id="schedule-grid" style="border-collapse:separate;border-spacing:4px;min-width:500px;">
+          <thead>
+            <tr>
+              <th style="width:50px;"></th>
+              <th class="muted body-sm" style="text-align:center;font-weight:normal;padding:4px;">Mon</th>
+              <th class="muted body-sm" style="text-align:center;font-weight:normal;padding:4px;">Tue</th>
+              <th class="muted body-sm" style="text-align:center;font-weight:normal;padding:4px;">Wed</th>
+              <th class="muted body-sm" style="text-align:center;font-weight:normal;padding:4px;">Thu</th>
+              <th class="muted body-sm" style="text-align:center;font-weight:normal;padding:4px;">Fri</th>
+              <th class="muted body-sm" style="text-align:center;font-weight:normal;padding:4px;">Sat</th>
+              <th class="muted body-sm" style="text-align:center;font-weight:normal;padding:4px;">Sun</th>
+            </tr>
+          </thead>
+          <tbody id="grid-body"></tbody>
+        </table>
+      </div>
+      <p id="grid-summary" class="muted body-sm"></p>
+
+      <!-- Time window popup -->
+      <div id="window-popup" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;z-index:1000;min-width:260px;" class="stack">
+        <h3 class="h3" style="font-size:16px;margin-bottom:12px;">Set time window</h3>
+        <div class="row" style="gap:12px;align-items:center;margin-bottom:8px;">
+          <label class="label" style="min-width:40px;">Start</label>
+          <input type="time" id="window-start" value="06:00" style="padding:6px;border-radius:4px;border:1px solid var(--border);background:var(--surface);color:inherit;" />
+        </div>
+        <div class="row" style="gap:12px;align-items:center;margin-bottom:16px;">
+          <label class="label" style="min-width:40px;">End</label>
+          <input type="time" id="window-end" value="08:00" style="padding:6px;border-radius:4px;border:1px solid var(--border);background:var(--surface);color:inherit;" />
+        </div>
+        <div class="row" style="gap:8px;justify-content:flex-end;">
+          <button class="btn" id="window-clear">Clear window</button>
+          <button class="btn btn-primary" id="window-save">Save</button>
+        </div>
+      </div>
+      <div id="window-backdrop" style="display:none;position:fixed;inset:0;z-index:999;background:transparent;" onclick="closeWindowPopup()"></div>
+
+      <div class="row" style="gap:8px;">
+        <button class="btn" id="step2-back">← Back</button>
+        <button class="btn btn-primary" id="step2-next">Next →</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Profile -->
+    <div id="step-3" class="stack" style="gap: 20px; display:none;">
+      <h2 class="h3">Your profile</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div class="stack" style="gap:6px;">
+          <label class="label">Height (cm)</label>
+          <input type="number" id="height-cm" placeholder="175" min="100" max="250" style="padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:inherit;" />
+        </div>
+        <div class="stack" style="gap:6px;">
+          <label class="label">Weight (kg)</label>
+          <input type="number" id="weight-kg" placeholder="70" min="30" max="200" step="0.1" style="padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:inherit;" />
+        </div>
+        <div class="stack" style="gap:6px;" id="ftp-bike-wrap">
+          <label class="label">Cycling FTP (W)</label>
+          <input type="number" id="ftp-w" placeholder="Auto-detect…" min="50" max="600" style="padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:inherit;" />
+        </div>
+        <div class="stack" style="gap:6px;">
+          <label class="label">Run threshold pace (min:sec/km)</label>
+          <input type="text" id="ftp-run" placeholder="e.g. 5:30" style="padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:inherit;" />
+        </div>
+        <div class="stack" style="gap:6px;" id="ftp-swim-wrap">
+          <label class="label">Swim CSS (sec/100m)</label>
+          <input type="number" id="ftp-swim" placeholder="Auto-detect…" min="50" max="300" style="padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:inherit;" />
+        </div>
+        <div class="stack" style="gap:6px;">
+          <label class="label">Current fitness (CTL)</label>
+          <div id="ctl-display" class="muted body-sm" style="padding:8px 0;">Loading…</div>
+        </div>
+      </div>
+      <p class="muted body-sm">All fields optional — we'll estimate from your activity history.</p>
+      <div class="row" style="gap:8px;">
+        <button class="btn" id="step3-back">← Back</button>
+        <button class="btn btn-primary" id="step3-next">Generate Plan →</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Generate + preview -->
+    <div id="step-4" class="stack" style="gap: 20px; display:none;">
+      <div class="row">
+        <h2 class="h3">Your Plan</h2>
+        <button class="btn row-end" id="step4-back">← Back</button>
+      </div>
+
+      <div id="generate-loading" class="muted body-sm">Generating your plan…</div>
+      <div id="generate-error" style="display:none;color:var(--danger,#f87171);" class="body-sm"></div>
+
+      <div id="audit-block" style="display:none;" class="panel">
+        <div class="panel-body stack" style="gap:8px;">
+          <p class="body-sm" id="audit-summary"></p>
+          <div id="audit-warnings" class="stack" style="gap:6px;"></div>
+        </div>
+      </div>
+
+      <div id="week-nav" style="display:none;">
+        <div class="row" style="gap:12px;align-items:center;margin-bottom:16px;">
+          <button class="btn" id="prev-week" disabled>‹ Prev</button>
+          <span id="week-label" class="label" style="flex:1;text-align:center;"></span>
+          <button class="btn" id="next-week">Next ›</button>
+        </div>
+        <div id="week-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;"></div>
+        <p id="week-stats" class="muted body-sm" style="margin-top:8px;text-align:center;"></p>
+      </div>
+
+      <a id="view-plan-btn" href="#" class="btn btn-primary" style="display:none;text-align:center;text-decoration:none;">View my plan →</a>
+    </div>
+  </div>
+</Shell>
+
+<style>
+.step-dot {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--surface-raised, var(--surface)); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: var(--fg-muted);
+}
+.step-dot.active { background: var(--pace-500); color: #fff; border-color: var(--pace-500); }
+.step-dot.done { background: var(--success, #10b981); color: #fff; border-color: var(--success, #10b981); }
+.step-line { flex: 1; height: 1px; background: var(--border); }
+.grid-cell {
+  width: 68px; height: 54px; border-radius: 6px; cursor: pointer;
+  border: 1px dashed var(--border); background: var(--surface);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-size: 11px; gap: 2px; transition: border-color 0.1s;
+}
+.grid-cell.short { background: var(--pace-900, #1e1b4b); border-color: var(--pace-500); color: var(--pace-400, #818cf8); }
+.grid-cell.moderate { background: oklch(0.28 0.10 50); border-color: oklch(0.60 0.18 50); color: oklch(0.85 0.18 50); }
+.grid-cell.long { background: oklch(0.22 0.12 140); border-color: oklch(0.55 0.18 140); color: oklch(0.80 0.18 140); }
+.session-cell {
+  border-radius: 6px; padding: 8px 4px; text-align: center; min-height: 60px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-size: 11px; gap: 2px;
+}
+.session-cell.empty { background: var(--surface); border: 1px dashed var(--border); color: var(--fg-muted); }
+.session-cell.swim { background: var(--pace-900, #1e1b4b); border: 1px solid var(--pace-500); }
+.session-cell.bike { background: oklch(0.26 0.10 50); border: 1px solid oklch(0.55 0.18 50); }
+.session-cell.run { background: oklch(0.20 0.12 140); border: 1px solid oklch(0.50 0.18 140); }
+</style>
+
+<script>
+type Intensity = 'short' | 'moderate' | 'long';
+type Sport = 'swim' | 'bike' | 'run';
+
+interface ScheduleCell {
+  intensity: Intensity | null;
+  window?: { start: string; end: string };
+}
+
+let currentStep = 1;
+let selectedRace = '';
+let raceDate = '';
+let scheduleGrid: Record<string, Record<number, ScheduleCell>> = { swim: {}, bike: {}, run: {} };
+let profile = { heightCm: 0, weightKg: 0, ftpW: 0, ftpRunPaceSec: 0, ftpSwimCssSec: 0, ctlBaseline: 0 };
+let generatedPlan: any = null;
+let currentWeek = 0;
+let activePopupCell: { sport: string; day: number } | null = null;
+
+const SPORT_EMOJI: Record<string, string> = { swim: '🏊', bike: '🚴', run: '🏃' };
+const INTENSITY_CYCLE: (Intensity | null)[] = [null, 'short', 'moderate', 'long'];
+const MIN_WEEKS: Record<string, number> = { sprint: 4, olympic: 8, '703': 12, full: 16, 'half-marathon': 8 };
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+function showStep(n: number) {
+  for (let i = 1; i <= 4; i++) {
+    (document.getElementById(`step-${i}`) as HTMLElement).style.display = i === n ? '' : 'none';
+  }
+  document.querySelectorAll('.step-dot').forEach(dot => {
+    const s = Number((dot as HTMLElement).dataset.step);
+    dot.classList.toggle('active', s === n);
+    dot.classList.toggle('done', s < n);
+  });
+  currentStep = n;
+}
+
+// Step 1
+document.querySelectorAll('.race-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.race-btn').forEach(b => (b as HTMLElement).style.borderColor = 'transparent');
+    (btn as HTMLElement).style.borderColor = 'var(--pace-500)';
+    selectedRace = (btn as HTMLElement).dataset.race!;
+    checkStep1();
+  });
+});
+
+(document.getElementById('race-date') as HTMLInputElement).addEventListener('input', e => {
+  raceDate = (e.target as HTMLInputElement).value;
+  checkStep1();
+});
+
+function checkStep1() {
+  const btn = document.getElementById('step1-next') as HTMLButtonElement;
+  const warn = document.getElementById('date-warning')!;
+  if (!selectedRace || !raceDate) { btn.disabled = true; return; }
+  const weeks = Math.floor((new Date(raceDate).getTime() - Date.now()) / (7 * 86400_000));
+  const min = MIN_WEEKS[selectedRace] ?? 4;
+  if (weeks < 1) {
+    btn.disabled = true; warn.style.display = ''; warn.textContent = 'Race date must be in the future.';
+  } else {
+    btn.disabled = false;
+    warn.style.display = weeks < min ? '' : 'none';
+    if (weeks < min) warn.textContent = `Only ${weeks} weeks away — plan will be compressed (recommended: ${min}+).`;
+  }
+}
+
+document.getElementById('step1-next')!.addEventListener('click', () => { rebuildGrid(); showStep(2); });
+
+// Step 2: Schedule grid
+function rebuildGrid() {
+  const isRunOnly = selectedRace === 'half-marathon';
+  const sports: Sport[] = isRunOnly ? ['run'] : ['swim', 'bike', 'run'];
+  const tbody = document.getElementById('grid-body')!;
+  tbody.innerHTML = '';
+  for (const sport of sports) {
+    if (!scheduleGrid[sport]) scheduleGrid[sport] = {};
+    const tr = document.createElement('tr');
+    const th = document.createElement('th');
+    th.style.cssText = 'text-align:left;padding:4px 6px;font-size:16px;';
+    th.textContent = SPORT_EMOJI[sport];
+    tr.appendChild(th);
+    for (let day = 0; day < 7; day++) {
+      const td = document.createElement('td');
+      td.style.padding = '2px';
+      const cell = scheduleGrid[sport][day] ?? { intensity: null };
+      const div = document.createElement('div');
+      div.className = `grid-cell${cell.intensity ? ' ' + cell.intensity : ''}`;
+      div.dataset.sport = sport; div.dataset.day = String(day);
+      if (cell.intensity) {
+        div.innerHTML = `<span>${cell.intensity}</span>${cell.window ? `<span style="font-size:9px;opacity:.7">${cell.window.start}</span>` : ''}`;
+      } else {
+        div.innerHTML = '<span style="opacity:.3;font-size:18px;">+</span>';
+      }
+      div.addEventListener('click', () => handleCellClick(sport, day));
+      td.appendChild(div);
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  updateGridSummary();
+}
+
+function handleCellClick(sport: string, day: number) {
+  const cell = scheduleGrid[sport][day] ?? { intensity: null };
+  if (cell.intensity) {
+    openWindowPopup(sport, day);
+    return;
+  }
+  const idx = INTENSITY_CYCLE.indexOf(cell.intensity);
+  const next = INTENSITY_CYCLE[(idx + 1) % INTENSITY_CYCLE.length];
+  scheduleGrid[sport][day] = { intensity: next };
+  rebuildGrid();
+}
+
+function openWindowPopup(sport: string, day: number) {
+  activePopupCell = { sport, day };
+  const cell = scheduleGrid[sport][day];
+  (document.getElementById('window-start') as HTMLInputElement).value = cell?.window?.start ?? '06:00';
+  (document.getElementById('window-end') as HTMLInputElement).value = cell?.window?.end ?? '08:00';
+  document.getElementById('window-popup')!.style.display = '';
+  document.getElementById('window-backdrop')!.style.display = '';
+}
+
+(window as any).closeWindowPopup = () => {
+  document.getElementById('window-popup')!.style.display = 'none';
+  document.getElementById('window-backdrop')!.style.display = 'none';
+  activePopupCell = null;
+};
+
+document.getElementById('window-save')!.addEventListener('click', () => {
+  if (!activePopupCell) return;
+  const start = (document.getElementById('window-start') as HTMLInputElement).value;
+  const end = (document.getElementById('window-end') as HTMLInputElement).value;
+  const { sport, day } = activePopupCell;
+  if (!scheduleGrid[sport][day]) scheduleGrid[sport][day] = { intensity: 'short' };
+  scheduleGrid[sport][day]!.window = { start, end };
+  (window as any).closeWindowPopup();
+  rebuildGrid();
+});
+
+document.getElementById('window-clear')!.addEventListener('click', () => {
+  if (!activePopupCell) return;
+  const { sport, day } = activePopupCell;
+  if (scheduleGrid[sport][day]) delete scheduleGrid[sport][day]!.window;
+  (window as any).closeWindowPopup();
+  rebuildGrid();
+});
+
+function updateGridSummary() {
+  let sessions = 0, mins = 0;
+  const MINS: Record<string, number> = { short: 45, moderate: 75, long: 150 };
+  for (const sport of Object.keys(scheduleGrid)) {
+    for (const cell of Object.values(scheduleGrid[sport])) {
+      if (cell.intensity) { sessions++; mins += MINS[cell.intensity] ?? 60; }
+    }
+  }
+  document.getElementById('grid-summary')!.textContent =
+    sessions > 0 ? `${sessions} sessions · ~${(mins / 60).toFixed(1)}h/week available` : 'Select days above.';
+}
+
+document.getElementById('step2-back')!.addEventListener('click', () => showStep(1));
+document.getElementById('step2-next')!.addEventListener('click', async () => { await loadProfile(); showStep(3); });
+
+// Step 3: Profile
+async function loadProfile() {
+  try {
+    const res = await fetch('/api/v1/me/ftp-estimates');
+    if (res.ok) {
+      const est = await res.json() as { ftpW: number | null; ftpRunPaceSec: number | null; ftpSwimCssSec: number | null };
+      if (est.ftpW) (document.getElementById('ftp-w') as HTMLInputElement).placeholder = `${est.ftpW} (estimated)`;
+      if (est.ftpRunPaceSec) {
+        const m = Math.floor(est.ftpRunPaceSec / 60), s = est.ftpRunPaceSec % 60;
+        (document.getElementById('ftp-run') as HTMLInputElement).placeholder = `${m}:${String(s).padStart(2,'0')} (estimated)`;
+      }
+      if (est.ftpSwimCssSec) (document.getElementById('ftp-swim') as HTMLInputElement).placeholder = `${est.ftpSwimCssSec}s (estimated)`;
+    }
+  } catch {}
+  try {
+    const res = await fetch('/api/v1/me/pmc?days=1');
+    if (res.ok) {
+      const data = await res.json() as any;
+      const latest = data.items?.[data.items.length - 1];
+      if (latest?.ctl) {
+        profile.ctlBaseline = Math.round(latest.ctl);
+        document.getElementById('ctl-display')!.textContent = `${profile.ctlBaseline} CTL`;
+      } else {
+        document.getElementById('ctl-display')!.textContent = 'No activity data yet — using default baseline.';
+      }
+    }
+  } catch {}
+  const isRunOnly = selectedRace === 'half-marathon';
+  (document.getElementById('ftp-bike-wrap') as HTMLElement).style.display = isRunOnly ? 'none' : '';
+  (document.getElementById('ftp-swim-wrap') as HTMLElement).style.display = isRunOnly ? 'none' : '';
+}
+
+document.getElementById('step3-back')!.addEventListener('click', () => showStep(2));
+document.getElementById('step3-next')!.addEventListener('click', () => {
+  profile.heightCm = Number((document.getElementById('height-cm') as HTMLInputElement).value) || 0;
+  profile.weightKg = Number((document.getElementById('weight-kg') as HTMLInputElement).value) || 0;
+  profile.ftpW = Number((document.getElementById('ftp-w') as HTMLInputElement).value) || 0;
+  profile.ftpSwimCssSec = Number((document.getElementById('ftp-swim') as HTMLInputElement).value) || 0;
+  const runStr = (document.getElementById('ftp-run') as HTMLInputElement).value;
+  if (runStr.includes(':')) {
+    const [m, s] = runStr.split(':').map(Number);
+    profile.ftpRunPaceSec = (m || 0) * 60 + (s || 0);
+  }
+  showStep(4);
+  generatePlan();
+});
+
+document.getElementById('step4-back')!.addEventListener('click', () => showStep(3));
+
+// Step 4: Generate
+async function generatePlan() {
+  document.getElementById('generate-loading')!.style.display = '';
+  document.getElementById('generate-error')!.style.display = 'none';
+  document.getElementById('week-nav')!.style.display = 'none';
+  document.getElementById('audit-block')!.style.display = 'none';
+  (document.getElementById('view-plan-btn') as HTMLAnchorElement).style.display = 'none';
+
+  const cleanGrid: Record<string, Record<number, any>> = {};
+  for (const sport of Object.keys(scheduleGrid)) {
+    const cells: Record<number, any> = {};
+    for (const [day, cell] of Object.entries(scheduleGrid[sport])) {
+      if (cell.intensity) cells[Number(day)] = cell;
+    }
+    if (Object.keys(cells).length > 0) cleanGrid[sport] = cells;
+  }
+
+  try {
+    const raceDateTs = Math.floor(new Date(raceDate).getTime() / 1000);
+    const res = await fetch('/api/v1/plans', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        raceType: selectedRace, raceDateTs,
+        ctlBaseline: profile.ctlBaseline,
+        ftpW: profile.ftpW, ftpRunPaceSec: profile.ftpRunPaceSec, ftpSwimCssSec: profile.ftpSwimCssSec,
+        heightCm: profile.heightCm || undefined, weightKg: profile.weightKg || undefined,
+        grid: cleanGrid,
+      }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    generatedPlan = await res.json();
+    document.getElementById('generate-loading')!.style.display = 'none';
+
+    if (generatedPlan.audit) {
+      document.getElementById('audit-block')!.style.display = '';
+      document.getElementById('audit-summary')!.textContent = generatedPlan.audit.summary;
+      document.getElementById('audit-warnings')!.innerHTML = (generatedPlan.audit.warnings ?? []).map((w: any) =>
+        `<div style="padding:8px 12px;border-radius:6px;background:${w.severity==='error'?'oklch(0.2 0.08 25)':'oklch(0.25 0.10 60)'};color:${w.severity==='error'?'#f87171':'oklch(0.85 0.18 60)'};" class="body-sm">${w.severity==='error'?'⛔':'⚠️'} ${w.message}</div>`
+      ).join('');
+    }
+
+    currentWeek = 0;
+    renderWeek();
+    document.getElementById('week-nav')!.style.display = '';
+    const btn = document.getElementById('view-plan-btn') as HTMLAnchorElement;
+    btn.href = `/plans/${generatedPlan.planId}`;
+    btn.style.display = '';
+  } catch (err) {
+    document.getElementById('generate-loading')!.style.display = 'none';
+    const errEl = document.getElementById('generate-error')!;
+    errEl.style.display = '';
+    errEl.textContent = `Error generating plan: ${err instanceof Error ? err.message : String(err)}`;
+  }
+}
+
+function renderWeek() {
+  if (!generatedPlan?.weeks) return;
+  const weeks = generatedPlan.weeks;
+  const week = weeks[currentWeek];
+  document.getElementById('week-label')!.textContent = `Week ${week.weekNum} of ${weeks.length} — ${week.phase.toUpperCase()} · ${week.tss} TSS · ${week.hours}h`;
+  (document.getElementById('prev-week') as HTMLButtonElement).disabled = currentWeek === 0;
+  (document.getElementById('next-week') as HTMLButtonElement).disabled = currentWeek === weeks.length - 1;
+
+  const byDay: Record<number, any[]> = {};
+  for (const s of week.sessions) { const d = s.day ?? 0; if (!byDay[d]) byDay[d] = []; byDay[d].push(s); }
+
+  const grid = document.getElementById('week-grid')!;
+  grid.innerHTML = '';
+  for (let d = 0; d < 7; d++) {
+    const div = document.createElement('div');
+    div.className = 'stack'; div.style.gap = '4px';
+    const lbl = document.createElement('div');
+    lbl.className = 'muted body-sm'; lbl.style.cssText = 'text-align:center;font-size:10px;';
+    lbl.textContent = DAY_NAMES[d]; div.appendChild(lbl);
+    const sessions = byDay[d] ?? [];
+    if (sessions.length === 0) {
+      const cell = document.createElement('div'); cell.className = 'session-cell empty'; cell.textContent = '—'; div.appendChild(cell);
+    } else {
+      for (const s of sessions) {
+        const cell = document.createElement('div'); cell.className = `session-cell ${s.sport ?? ''}`;
+        cell.innerHTML = `<span style="font-size:18px">${SPORT_EMOJI[s.sport]??'🏋️'}</span><span>${s.durationMin}m</span><span style="opacity:.6;font-size:9px">Z${s.zone}</span>`;
+        div.appendChild(cell);
+      }
+    }
+    grid.appendChild(div);
+  }
+}
+
+document.getElementById('prev-week')!.addEventListener('click', () => { if (currentWeek > 0) { currentWeek--; renderWeek(); } });
+document.getElementById('next-week')!.addEventListener('click', () => { if (generatedPlan && currentWeek < generatedPlan.weeks.length - 1) { currentWeek++; renderWeek(); } });
+</script>
